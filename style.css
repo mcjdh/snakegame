@@ -1,0 +1,147 @@
+:root {
+    --bg-color: #121212;
+    --text-color: #f5f5f5;
+    --accent-color: #4ade80;
+    --accent-hover: #22c55e;
+    --danger-color: #ef4444;
+    --border-radius: 8px;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+    padding: 20px;
+}
+
+.game-container {
+    text-align: center;
+    max-width: 100%;
+    width: 100%;
+}
+
+h1 {
+    margin-bottom: 20px;
+    font-size: 2rem;
+    color: var(--accent-color);
+}
+
+.canvas-container {
+    position: relative;
+    margin: 0 auto;
+    max-width: 100%;
+    aspect-ratio: 1/1;
+}
+
+canvas {
+    background-color: #1e1e1e;
+    border: 2px solid var(--accent-color);
+    border-radius: var(--border-radius);
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 0 auto;
+}
+
+.score-container {
+    font-size: 1.5rem;
+    margin: 15px 0;
+    padding: 10px;
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: var(--border-radius);
+    display: inline-block;
+}
+
+.controls {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-top: 15px;
+}
+
+button {
+    padding: 12px 24px;
+    font-size: 1rem;
+    background-color: var(--accent-color);
+    color: var(--bg-color);
+    border: none;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    font-weight: bold;
+}
+
+button:hover {
+    background-color: var(--accent-hover);
+}
+
+.touch-controls {
+    display: none;
+    grid-template-areas:
+        ". up ."
+        "left . right"
+        ". down .";
+    grid-gap: 10px;
+    margin-top: 20px;
+    max-width: 200px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.touch-btn {
+    width: 60px;
+    height: 60px;
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 24px;
+    user-select: none;
+}
+
+.touch-btn.up { grid-area: up; }
+.touch-btn.down { grid-area: down; }
+.touch-btn.left { grid-area: left; }
+.touch-btn.right { grid-area: right; }
+
+@media (max-width: 768px) {
+    .touch-controls {
+        display: grid;
+    }
+    
+    .canvas-container {
+        width: 90%;
+    }
+    
+    h1 {
+        font-size: 1.5rem;
+    }
+    
+    .score-container {
+        font-size: 1.2rem;
+    }
+}
+
+@media (min-width: 768px) {
+    .game-container {
+        width: 500px;
+    }
+    
+    .canvas-container {
+        width: 400px;
+        height: 400px;
+    }
+}
