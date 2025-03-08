@@ -14,8 +14,31 @@
             <canvas id="gameCanvas" width="400" height="400"></canvas>
         </div>
         <div class="score-container">Score: <span id="score">0</span></div>
+        
+        <div class="game-stats">
+            <div class="stat-item">
+                <div class="stat-title">LEVEL</div>
+                <div id="level-display">1: Beginner</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-title">COMBO</div>
+                <div id="combo-display">x1.0</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-title">POWER-UPS</div>
+                <div id="powerups-display">0</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-title">FOOD TYPE</div>
+                <div id="food-display">Normal</div>
+            </div>
+        </div>
+        
         <div class="controls">
-            <button id="restartButton">Restart Game</button>
+            <div class="button-row">
+                <button id="restartButton">Restart Game</button>
+                <button id="soundToggle" class="sound-toggle">Sound: ON</button>
+            </div>
         </div>
         <div class="touch-controls">
             <div class="touch-btn up">⬆️</div>
@@ -27,6 +50,7 @@
     
     <!-- Load modules in the correct order -->
     <script src="js/utils.js"></script>
+    <script src="js/sound.js"></script>
     <script src="js/renderer.js"></script>
     <script src="js/gameState.js"></script>
     <script src="js/zones.js"></script>

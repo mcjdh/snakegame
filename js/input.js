@@ -159,6 +159,30 @@ const InputHandler = (() => {
     function setupButtonControls() {
         const restartButton = document.getElementById('restartButton');
         restartButton.addEventListener('click', resetCallback);
+        
+        // Add sound toggle button
+        const soundToggleBtn = document.getElementById('soundToggle');
+        if (soundToggleBtn) {
+            soundToggleBtn.addEventListener('click', toggleSound);
+        }
+    }
+    
+    // Toggle sound
+    function toggleSound() {
+        if (typeof SoundManager !== 'undefined') {
+            const isEnabled = SoundManager.toggleSound();
+            const soundToggleBtn = document.getElementById('soundToggle');
+            
+            if (soundToggleBtn) {
+                soundToggleBtn.textContent = isEnabled ? 'Sound: ON' : 'Sound: OFF';
+                soundToggleBtn.classList.toggle('sound-off', !isEnabled);
+            }
+            
+            // Play test sound if enabled
+            if (isEnabled) {
+                SoundManager.play('powerUp');
+            }
+        }
     }
     
     // Cleanup event listeners to prevent memory leaks
@@ -176,6 +200,11 @@ const InputHandler = (() => {
         
         const restartButton = document.getElementById('restartButton');
         restartButton.removeEventListener('click', resetCallback);
+        
+        const soundToggleBtn = document.getElementById('soundToggle');
+        if (soundToggleBtn) {
+            soundToggleBtn.removeEventListener('click', toggleSound);
+        }
     }
     
     return {

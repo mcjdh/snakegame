@@ -15,27 +15,76 @@ const GameState = (() => {
             color: '#4361ee', 
             duration: 5000, 
             effect: 'Clears nearby zones',
-            symbol: '✨'
+            symbol: '✨',
+            rarity: 'common'
         },
         SLOW_DECAY: { 
             color: '#7209b7', 
             duration: 10000, 
             effect: 'Zones decay faster',
-            symbol: '🕒'
+            symbol: '🕒',
+            rarity: 'uncommon'
         },
         SCORE_BOOST: { 
             color: '#ffce1a', 
             duration: 7000, 
             effect: '2x points',
-            symbol: '💎'
+            symbol: '💎',
+            rarity: 'uncommon'
         },
         PHASE_THROUGH: { 
             color: '#14213d', 
             duration: 3000, 
             effect: 'Pass through zones',
-            symbol: '👻'
+            symbol: '👻',
+            rarity: 'rare'
+        },
+        SPEED_BOOST: {
+            color: '#06d6a0',
+            duration: 5000,
+            effect: 'Move faster!',
+            symbol: '⚡',
+            rarity: 'common'
+        },
+        MAGNET: {
+            color: '#e63946',
+            duration: 8000,
+            effect: 'Attract food',
+            symbol: '🧲',
+            rarity: 'uncommon'
+        },
+        SHRINK: {
+            color: '#fb8500',
+            duration: 0,
+            effect: 'Shrink snake',
+            symbol: '📏',
+            rarity: 'rare'
+        },
+        INVULNERABILITY: {
+            color: '#ffd60a',
+            duration: 3000,
+            effect: 'Invulnerable',
+            symbol: '🛡️',
+            rarity: 'epic'
         }
     };
+    
+    // Food types (new)
+    const FOOD_TYPES = {
+        NORMAL: { color: '#ef4444', points: 10, chance: 0.7 },
+        BONUS: { color: '#ff9f1c', points: 20, chance: 0.2 },
+        SUPER: { color: '#f72585', points: 50, chance: 0.09 },
+        EPIC: { color: '#7209b7', points: 100, chance: 0.01 }
+    };
+
+    // Level configuration (new)
+    const LEVEL_CONFIG = [
+        { threshold: 0, zonePattern: 'alternate', speed: 150, zoneDuration: 3500, name: "Beginner" },
+        { threshold: 100, zonePattern: 'continuous', speed: 140, zoneDuration: 3200, name: "Intermediate" },
+        { threshold: 250, zonePattern: 'random', speed: 130, zoneDuration: 3000, name: "Advanced" },
+        { threshold: 500, zonePattern: 'random', speed: 120, zoneDuration: 2800, name: "Expert" },
+        { threshold: 1000, zonePattern: 'random', speed: 100, zoneDuration: 2500, name: "Master" }
+    ];
     
     // Game state
     let state = {
@@ -53,7 +102,8 @@ const GameState = (() => {
         // Food
         food: {
             x: Math.floor(Math.random() * tileCount),
-            y: Math.floor(Math.random() * tileCount)
+            y: Math.floor(Math.random() * tileCount),
+            type: 'NORMAL'
         },
         
         // Movement tracking
@@ -79,7 +129,17 @@ const GameState = (() => {
         
         // Power-ups
         powerUps: [],
-        activePowerUps: []
+        activePowerUps: [],
+        
+        // Player stats (new)
+        level: 0,
+        levelName: "Beginner",
+        powerUpsCollected: 0,
+        highestCombo: 0,
+        
+        // Special effects (new)
+        particles: [],
+        screenShake: { intensity: 0, duration: 0, startTime: 0 }
     };
     
     // Initialize the game state
@@ -116,13 +176,19 @@ const GameState = (() => {
         state.multiplier = 1;
         state.difficultyAdjusted = false;
         state.consecutiveDangerZones = 0;
+        state.level = 0;
+        state.levelName = LEVEL_CONFIG[0].name;
+        state.powerUpsCollected = 0;
+        state.highestCombo = 0;
+        state.particles = [];
+        state.screenShake = { intensity: 0, duration: 0, startTime: 0 };
         
         generateFood();
         scoreElement.textContent = state.score;
         state.lastRenderTime = performance.now();
     }
     
-    // Generate new food in a valid position
+    // Generate new food in a valid position with food type
     function generateFood() {
         const availablePositions = [];
         
@@ -163,16 +229,62 @@ const GameState = (() => {
         // Pick a random available position
         if (availablePositions.length > 0) {
             const randomIndex = Math.floor(Math.random() * availablePositions.length);
-            state.food = availablePositions[randomIndex];
+            const pos = availablePositions[randomIndex];
+            
+            // Select food type based on rarity
+            const foodTypeRoll = Math.random();
+            let accumulatedChance = 0;
+            let selectedType = 'NORMAL';
+            
+            for (const [type, props] of Object.entries(FOOD_TYPES)) {
+                accumulatedChance += props.chance;
+                if (foodTypeRoll <= accumulatedChance) {
+                    selectedType = type;
+                    break;
+                }
+            }
+            
+            state.food = {
+                x: pos.x,
+                y: pos.y,
+                type: selectedType,
+                pulsePhase: 0
+            };
+            
+            // Add particles for special food types
+            if (selectedType !== 'NORMAL') {
+                createFoodSpawnParticles(pos.x, pos.y, FOOD_TYPES[selectedType].color);
+            }
         } else {
             // Fallback if no positions are available (rare edge case)
             state.food = {
                 x: Math.floor(Math.random() * tileCount),
-                y: Math.floor(Math.random() * tileCount)
+                y: Math.floor(Math.random() * tileCount),
+                type: 'NORMAL',
+                pulsePhase: 0
             };
         }
     }
     
+    // Create particles for food spawns (new)
+    function createFoodSpawnParticles(x, y, color) {
+        const particleCount = 10;
+        for (let i = 0; i < particleCount; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 0.5 + Math.random() * 1.5;
+            state.particles.push({
+                x: x * gridSize + halfGridSize,
+                y: y * gridSize + halfGridSize,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                radius: 2 + Math.random() * 3,
+                color: color,
+                alpha: 1,
+                decay: 0.02 + Math.random() * 0.04
+            });
+        }
+    }
+
     // Track the snake's recent positions for trail visualization
     function trackSnakePosition(currentTime) {
         if (state.snake.length > 0) {
@@ -190,14 +302,135 @@ const GameState = (() => {
     
     // Move the snake
     function moveSnake() {
-        // Calculate new head position
+        // Check if speed boost is active
+        const speedModifier = isPowerUpActive('SPEED_BOOST') ? 1.5 : 1;
+        
+        // Calculate new head position with potential speed boost
         const newHead = {
-            x: state.snake[0].x + state.snakeSpeed.x,
-            y: state.snake[0].y + state.snakeSpeed.y
+            x: state.snake[0].x + state.snakeSpeed.x * speedModifier,
+            y: state.snake[0].y + state.snakeSpeed.y * speedModifier
         };
+        
+        // If speed boost caused position to skip cells, round to nearest cell
+        if (speedModifier > 1) {
+            newHead.x = Math.round(newHead.x);
+            newHead.y = Math.round(newHead.y);
+        }
         
         // Add new head to beginning of snake
         state.snake.unshift(newHead);
+        
+        // Check for magnet power-up to attract food
+        if (isPowerUpActive('MAGNET') && state.food) {
+            const headX = state.snake[0].x;
+            const headY = state.snake[0].y;
+            const foodX = state.food.x;
+            const foodY = state.food.y;
+            
+            // If food is within 5 units, move it 1 step closer to snake
+            if (Math.abs(headX - foodX) + Math.abs(headY - foodY) <= 5) {
+                // Move food toward snake
+                if (foodX < headX) state.food.x += 1;
+                else if (foodX > headX) state.food.x -= 1;
+                
+                if (foodY < headY) state.food.y += 1;
+                else if (foodY > headY) state.food.y -= 1;
+                
+                // Add attraction particle trail
+                createMagnetParticles(foodX, foodY, headX, headY);
+            }
+        }
+    }
+    
+    // Create magnet attraction particles (new)
+    function createMagnetParticles(foodX, foodY, headX, headY) {
+        const particleCount = 3;
+        for (let i = 0; i < particleCount; i++) {
+            const randOffset = (Math.random() - 0.5) * 0.5;
+            state.particles.push({
+                x: foodX * gridSize + halfGridSize + randOffset,
+                y: foodY * gridSize + halfGridSize + randOffset,
+                vx: (headX - foodX) * 0.1,
+                vy: (headY - foodY) * 0.1,
+                radius: 1 + Math.random() * 2,
+                color: '#e63946',
+                alpha: 0.7,
+                decay: 0.05 + Math.random() * 0.05
+            });
+        }
+    }
+    
+    // Check if current level should be updated based on score (new)
+    function checkLevelProgression() {
+        const currentLevel = state.level;
+        let newLevel = currentLevel;
+        
+        // Find appropriate level based on score
+        for (let i = LEVEL_CONFIG.length - 1; i >= 0; i--) {
+            if (state.score >= LEVEL_CONFIG[i].threshold) {
+                newLevel = i;
+                break;
+            }
+        }
+        
+        // If level changed, update game parameters
+        if (newLevel !== currentLevel) {
+            state.level = newLevel;
+            state.levelName = LEVEL_CONFIG[newLevel].name;
+            state.gameSpeed = LEVEL_CONFIG[newLevel].speed;
+            state.baseSpeed = LEVEL_CONFIG[newLevel].speed;
+            state.zonePattern = LEVEL_CONFIG[newLevel].zonePattern;
+            state.forbiddenDuration = LEVEL_CONFIG[newLevel].zoneDuration;
+            
+            // Show level up notification and add visual effect
+            showPowerUpNotification(`Level Up: ${state.levelName}!`);
+            triggerScreenShake(5, 500);
+            
+            // Create celebration particles
+            createLevelUpParticles();
+            
+            // Play sound if implemented
+            if (typeof SoundManager !== 'undefined') {
+                SoundManager.play('levelUp');
+            }
+            
+            return true;
+        }
+        
+        return false;
+    }
+    
+    // Create level up celebration particles (new)
+    function createLevelUpParticles() {
+        const particleCount = 30;
+        const centerX = 200; // Half of canvas width (400/2)
+        const centerY = 200; // Half of canvas height (400/2)
+        
+        for (let i = 0; i < particleCount; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 1 + Math.random() * 3;
+            const hue = Math.floor(Math.random() * 360);
+            
+            state.particles.push({
+                x: centerX,
+                y: centerY,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                radius: 3 + Math.random() * 4,
+                color: `hsl(${hue}, 80%, 60%)`,
+                alpha: 1,
+                decay: 0.01 + Math.random() * 0.02
+            });
+        }
+    }
+    
+    // Trigger screen shake effect (new)
+    function triggerScreenShake(intensity, duration) {
+        state.screenShake = {
+            intensity: intensity,
+            duration: duration,
+            startTime: performance.now()
+        };
     }
     
     // Check for collisions
@@ -238,6 +471,11 @@ const GameState = (() => {
                     }
                 }
             }
+        }
+        
+        // Add invulnerability power-up check
+        if (isPowerUpActive('INVULNERABILITY')) {
+            return false;
         }
         
         return false;
@@ -295,23 +533,58 @@ const GameState = (() => {
             const randomIndex = Math.floor(Math.random() * availablePositions.length);
             const pos = availablePositions[randomIndex];
             
-            // Select random power-up type
-            const powerUpTypes = Object.keys(POWER_UP_TYPES);
-            const randomType = powerUpTypes[Math.floor(Math.random() * powerUpTypes.length)];
-            const powerUpInfo = POWER_UP_TYPES[randomType];
+            // Select random power-up type based on rarity
+            const powerUpTypes = Object.entries(POWER_UP_TYPES);
+            const rarityWeights = {
+                'common': 0.5,
+                'uncommon': 0.3,
+                'rare': 0.15,
+                'epic': 0.05
+            };
+            
+            // Weight-based selection
+            const roll = Math.random();
+            let cumulativeWeight = 0;
+            let selectedType = null;
+            
+            for (const [type, info] of powerUpTypes) {
+                cumulativeWeight += rarityWeights[info.rarity];
+                if (roll <= cumulativeWeight) {
+                    selectedType = type;
+                    break;
+                }
+            }
+            
+            // Fallback if no type was selected
+            if (!selectedType) {
+                selectedType = powerUpTypes[0][0]; // Default to first type
+            }
+            
+            const powerUpInfo = POWER_UP_TYPES[selectedType];
             
             // Create power-up object
             const newPowerUp = {
                 x: pos.x,
                 y: pos.y,
-                type: randomType,
+                type: selectedType,
                 color: powerUpInfo.color,
                 duration: powerUpInfo.duration,
                 symbol: powerUpInfo.symbol,
-                pulsePhase: 0
+                pulsePhase: 0,
+                rarity: powerUpInfo.rarity
             };
             
             state.powerUps.push(newPowerUp);
+            
+            // Create spawn particles based on rarity
+            const particleColors = {
+                'common': '#4ade80',
+                'uncommon': '#60a5fa',
+                'rare': '#c084fc',
+                'epic': '#fcd34d'
+            };
+            
+            createFoodSpawnParticles(pos.x, pos.y, particleColors[powerUpInfo.rarity]);
         }
     }
     
@@ -326,6 +599,7 @@ const GameState = (() => {
         };
         
         state.activePowerUps.push(activePU);
+        state.powerUpsCollected++;
         
         // Handle immediate effects
         if (powerUp.type === 'CLEAR_PATH') {
@@ -346,6 +620,24 @@ const GameState = (() => {
             showPowerUpNotification("Double Score Activated!");
         } else if (powerUp.type === 'PHASE_THROUGH') {
             showPowerUpNotification("Phase Through Activated!");
+        } else if (powerUp.type === 'SPEED_BOOST') {
+            showPowerUpNotification("Speed Boost Activated!");
+        } else if (powerUp.type === 'MAGNET') {
+            showPowerUpNotification("Food Magnet Activated!");
+        } else if (powerUp.type === 'SHRINK') {
+            // Shrink the snake by half but minimum 3 segments
+            const newLength = Math.max(3, Math.floor(state.snake.length / 2));
+            state.snake = state.snake.slice(0, newLength);
+            showPowerUpNotification("Snake Shrunk!");
+            triggerScreenShake(3, 300);
+        } else if (powerUp.type === 'INVULNERABILITY') {
+            showPowerUpNotification("Invulnerable!");
+            triggerScreenShake(3, 300);
+        }
+        
+        // Play power-up sound if implemented
+        if (typeof SoundManager !== 'undefined') {
+            SoundManager.play('powerUp');
         }
     }
     
@@ -381,6 +673,56 @@ const GameState = (() => {
         }
     }
     
+    // Update particles (new)
+    function updateParticles() {
+        if (state.particles.length === 0) return;
+        
+        for (let i = state.particles.length - 1; i >= 0; i--) {
+            const p = state.particles[i];
+            
+            // Update position
+            p.x += p.vx;
+            p.y += p.vy;
+            
+            // Update alpha
+            p.alpha -= p.decay;
+            
+            // Remove dead particles
+            if (p.alpha <= 0) {
+                state.particles.splice(i, 1);
+            }
+        }
+    }
+    
+    // Update screen shake (new)
+    function updateScreenShake(currentTime) {
+        if (!state.screenShake.intensity) return { x: 0, y: 0 };
+        
+        const elapsed = currentTime - state.screenShake.startTime;
+        if (elapsed >= state.screenShake.duration) {
+            state.screenShake.intensity = 0;
+            return { x: 0, y: 0 };
+        }
+        
+        const progress = elapsed / state.screenShake.duration;
+        const decayFactor = 1 - progress;
+        const intensity = state.screenShake.intensity * decayFactor;
+        
+        return {
+            x: (Math.random() * 2 - 1) * intensity,
+            y: (Math.random() * 2 - 1) * intensity
+        };
+    }
+    
+    // Handle combo system for consecutive food collection (new)
+    function updateComboSystem(currentTime) {
+        // Decay combo if timer has elapsed
+        if (state.comboCount > 0 && currentTime - state.comboTimer > 5000) {
+            state.comboCount = 0;
+            state.multiplier = 1;
+        }
+    }
+    
     // Update game state for a frame
     function update(currentTime, deltaTime) {
         if (state.gameOver) return;
@@ -391,12 +733,30 @@ const GameState = (() => {
         // Update power-ups
         updatePowerUps(currentTime);
         
+        // Update particles
+        updateParticles();
+        
+        // Update combo system
+        updateComboSystem(currentTime);
+        
         // Move the snake
         moveSnake();
         
         // Check for collision
         if (checkCollision()) {
             state.gameOver = true;
+            
+            // Add death particles
+            createDeathParticles();
+            
+            // Trigger screen shake
+            triggerScreenShake(10, 800);
+            
+            // Play death sound if implemented
+            if (typeof SoundManager !== 'undefined') {
+                SoundManager.play('death');
+            }
+            
             return;
         }
         
@@ -405,38 +765,64 @@ const GameState = (() => {
         
         // Check if snake eats food
         if (state.snake[0].x === state.food.x && state.snake[0].y === state.food.y) {
+            // Get food data
+            const foodType = state.food.type;
+            const foodData = FOOD_TYPES[foodType];
+            
+            // Update combo system
+            state.comboCount++;
+            state.comboTimer = currentTime;
+            state.multiplier = 1 + Math.min(1, state.comboCount * 0.1); // Cap at 2x
+            state.highestCombo = Math.max(state.highestCombo, state.comboCount);
+            
             // Calculate score with multipliers
-            let points = 10;
+            let points = foodData.points;
             if (isPowerUpActive('SCORE_BOOST')) {
                 points *= 2;
             }
+            // Apply combo multiplier
+            points = Math.floor(points * state.multiplier);
             
-            // Apply points
+            // Add points
             state.score += points;
             scoreElement.textContent = state.score;
             
-            // Create score popup
-            showScorePopup(points, state.food.x * gridSize + halfGridSize, state.food.y * gridSize);
+            // Create score popup with combo information
+            let comboText = '';
+            if (state.comboCount > 1) {
+                comboText = ` x${state.comboCount}`;
+            }
+            showScorePopup(`+${points}${comboText}`, state.food.x * gridSize + halfGridSize, state.food.y * gridSize);
+            
+            // Create food collection particles
+            createFoodCollectionParticles(state.food.x, state.food.y, foodData.color);
             
             // Generate new food
             generateFood();
             
-            // Increase game speed and adjust zone patterns based on score
-            if (state.score % 60 === 0 && state.gameSpeed > 70) {
+            // Check for level progression
+            const leveledUp = checkLevelProgression();
+            
+            // If we didn't just level up, adjust game speed
+            if (!leveledUp && state.score % 60 === 0 && state.gameSpeed > 70) {
                 state.gameSpeed -= 4;
                 
                 // Adjust difficulty and pattern as score increases
                 if (state.difficultyLevel < 2.5) {
                     state.difficultyLevel += 0.15;
                 }
-                
-                // Change zone pattern as player progresses
-                if (state.score === 60) {
-                    state.zonePattern = 'continuous'; // More challenging at higher scores
-                } else if (state.score === 120) {
-                    state.zonePattern = 'random';
-                    state.maxTrailLength += 5; // Longer trail tracking
-                }
+            }
+            
+            // Add small screen shake for food collection
+            if (foodType !== 'NORMAL') {
+                const intensity = foodType === 'EPIC' ? 8 : (foodType === 'SUPER' ? 5 : 3);
+                triggerScreenShake(intensity, 250);
+            }
+            
+            // Play appropriate sound effect if implemented
+            if (typeof SoundManager !== 'undefined') {
+                const soundType = foodType === 'NORMAL' ? 'eat' : 'eatSpecial';
+                SoundManager.play(soundType);
             }
         } else {
             // Remove tail segment
@@ -460,9 +846,51 @@ const GameState = (() => {
         state.moveCount++;
     }
     
+    // Create food collection particles (new)
+    function createFoodCollectionParticles(x, y, color) {
+        const particleCount = 15;
+        for (let i = 0; i < particleCount; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 0.8 + Math.random() * 2;
+            state.particles.push({
+                x: x * gridSize + halfGridSize,
+                y: y * gridSize + halfGridSize,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                radius: 1.5 + Math.random() * 3,
+                color: color,
+                alpha: 1,
+                decay: 0.03 + Math.random() * 0.05
+            });
+        }
+    }
+    
+    // Create death particles (new)
+    function createDeathParticles() {
+        if (state.snake.length === 0) return;
+        
+        const head = state.snake[0];
+        const particleCount = 25;
+        
+        for (let i = 0; i < particleCount; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 0.5 + Math.random() * 3;
+            state.particles.push({
+                x: head.x * gridSize + halfGridSize,
+                y: head.y * gridSize + halfGridSize,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                radius: 2 + Math.random() * 4,
+                color: i % 2 === 0 ? '#4ade80' : '#ef4444',
+                alpha: 1,
+                decay: 0.01 + Math.random() * 0.03
+            });
+        }
+    }
+    
     // Get full game state (for rendering)
     function getState() {
-        return { ...state };
+        return { ...state, shake: updateScreenShake(performance.now()) };
     }
     
     // Set snake direction
