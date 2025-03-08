@@ -117,6 +117,64 @@ button:hover {
 .touch-btn.left { grid-area: left; }
 .touch-btn.right { grid-area: right; }
 
+/* Score popup animation */
+.score-popup {
+    position: absolute;
+    color: #ffce1a;
+    font-size: 18px;
+    font-weight: bold;
+    pointer-events: none;
+    z-index: 100;
+    text-shadow: 0px 0px 8px rgba(255, 206, 26, 0.8);
+    animation: scorePopup 1s ease-out forwards;
+}
+
+@keyframes scorePopup {
+    0% {
+        opacity: 0;
+        transform: translateY(0);
+    }
+    10% {
+        opacity: 1;
+    }
+    90% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(-30px);
+    }
+}
+
+/* Power-up notification */
+.power-up-notification {
+    position: fixed;
+    top: 20%;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(0, 0, 0, 0.8);
+    color: var(--accent-color);
+    padding: 10px 20px;
+    border-radius: var(--border-radius);
+    font-weight: bold;
+    z-index: 200;
+    animation: fadeIn 0.3s ease-out;
+}
+
+.power-up-notification.fade-out {
+    animation: fadeOut 0.5s ease-in forwards;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translate(-50%, -10px); }
+    to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; transform: translate(-50%, 0); }
+    to { opacity: 0; transform: translate(-50%, -10px); }
+}
+
 @media (max-width: 768px) {
     .touch-controls {
         display: grid;
