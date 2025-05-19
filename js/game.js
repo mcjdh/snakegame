@@ -65,6 +65,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // Game loop using requestAnimationFrame with performance improvements
+    // Use fixed time step for smoother movement
+    const FIXED_TIME_STEP = 1000 / 60; // 60 updates per second
+    let accumulator = 0;
+
     function gameLoop(currentTime) {
         if (gameOver) {
             // Only render once in game over state
@@ -74,35 +78,32 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         animationFrameId = window.requestAnimationFrame(gameLoop);
-        
-        const state = GameState.getState();
-        
+
+        // Calculate deltaTime
+        let deltaTime = currentTime - lastRenderTime;
+        if (deltaTime > 1000) deltaTime = FIXED_TIME_STEP; // Prevent huge jumps on tab switch
+        accumulator += deltaTime;
+        lastRenderTime = currentTime;
+
         // Update UI stats periodically
         updateStats();
-        
-        // Throttle game updates based on game speed
-        const secondsSinceLastRender = (currentTime - lastRenderTime) / 1000;
-        if (secondsSinceLastRender < state.gameSpeed / 1000) return;
-        
-        // Calculate deltaTime properly for smoother animation
-        const deltaTime = currentTime - lastRenderTime;
-        lastRenderTime = currentTime;
-        
-        // Update game state
-        GameState.update(currentTime, deltaTime);
-        
+
+        // Fixed time step update
+        while (accumulator >= FIXED_TIME_STEP) {
+            GameState.update(currentTime, FIXED_TIME_STEP);
+            accumulator -= FIXED_TIME_STEP;
+        }
+
         // Get updated state and check for game over
         const updatedState = GameState.getState();
         if (updatedState.gameOver) {
             gameOver = true;
-            
-            // Play game over sound
             if (typeof SoundManager !== 'undefined') {
                 SoundManager.play('death');
             }
         }
-        
-        // Draw everything
+
+        // Draw everything (no interpolation for now, but could be added)
         Renderer.drawGame(updatedState, gridSize, halfGridSize);
     }
     
