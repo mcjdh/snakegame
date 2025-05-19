@@ -49,8 +49,38 @@ const Renderer = (() => {
         gridCanvas.height = canvas.height;
         const gridCtx = gridCanvas.getContext('2d');
         
-        // Draw grid (subtle)
-        gridCtx.strokeStyle = '#333333';
+        // Create a natural grass/dirt pattern
+        gridCtx.fillStyle = '#2a523d'; // Base color
+        gridCtx.fillRect(0, 0, gridCanvas.width, gridCanvas.height);
+        
+        // Add texture variations to make it look like grass/soil
+        for(let x = 0; x < tileCount; x++) {
+            for(let y = 0; y < tileCount; y++) {
+                // Randomly determine if this cell gets a texture variation
+                if(Math.random() < 0.4) {
+                    // Slight color variation for more natural look
+                    const variation = Math.random() * 15 - 5;
+                    const alpha = 0.1 + Math.random() * 0.1;
+                    
+                    gridCtx.fillStyle = `rgba(${40 + variation}, ${90 + variation}, ${70 + variation}, ${alpha})`;
+                    
+                    // Draw a few random dots/marks in the cell
+                    const dotCount = 1 + Math.floor(Math.random() * 3);
+                    for(let d = 0; d < dotCount; d++) {
+                        const dotX = x * gridSize + Math.random() * gridSize;
+                        const dotY = y * gridSize + Math.random() * gridSize;
+                        const dotSize = 1 + Math.random() * 2;
+                        
+                        gridCtx.beginPath();
+                        gridCtx.arc(dotX, dotY, dotSize, 0, Math.PI * 2);
+                        gridCtx.fill();
+                    }
+                }
+            }
+        }
+        
+        // Draw very subtle grid lines for gameplay clarity
+        gridCtx.strokeStyle = 'rgba(60, 130, 90, 0.2)';
         gridCtx.lineWidth = 0.5;
         
         for(let i = 0; i <= tileCount; i++) {
@@ -404,25 +434,43 @@ const Renderer = (() => {
                     offscreenCtx.fillStyle = `hsl(142, 76%, ${factor}%)`;
                 }
             } else {
-                // Normal coloring
+                // Normal coloring - more natural snake appearance
                 if (i === 0) {
-                    offscreenCtx.fillStyle = '#4ade80'; // Head
+                    offscreenCtx.fillStyle = '#5ba45f'; // Head - natural green color
                 } else {
-                    // Body with gradient
-                    offscreenCtx.fillStyle = `hsl(142, 76%, ${70 - (i * 2)}%)`;
+                    // Body with gradient and scale pattern effect
+                    const baseHue = 100; // Greener hue for natural look
+                    const lightness = 45 - (i % 3 * 5); // Alternating lightness for scale effect
+                    offscreenCtx.fillStyle = `hsl(${baseHue}, 65%, ${lightness}%)`;
                 }
             }
             
-            // Draw segment
+            // Draw segment with more natural shape
             offscreenCtx.beginPath();
             offscreenCtx.roundRect(
                 segment.x * gridSize, 
                 segment.y * gridSize, 
                 gridSize - 2, 
                 gridSize - 2,
-                4
+                6 // More rounded corners for organic feel
             );
             offscreenCtx.fill();
+            
+            // Add subtle scale pattern to snake body
+            if (i > 0 && !isPhasing && !isInvulnerable) {
+                offscreenCtx.save();
+                offscreenCtx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+                
+                // Draw a small arc in the center of each segment for scale effect
+                const centerX = segment.x * gridSize + gridSize/2;
+                const centerY = segment.y * gridSize + gridSize/2;
+                const radius = gridSize/5;
+                
+                offscreenCtx.beginPath();
+                offscreenCtx.arc(centerX, centerY, radius, 0, Math.PI, i % 2 === 0);
+                offscreenCtx.fill();
+                offscreenCtx.restore();
+            }
             
             // Add eye details to the head
             if (i === 0) {
