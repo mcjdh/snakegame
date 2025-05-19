@@ -67,7 +67,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Game loop using requestAnimationFrame with performance improvements
     // Use fixed time step for smoother movement
     const FIXED_TIME_STEP = 1000 / 60; // 60 updates per second
+    const MAX_UPDATES_PER_FRAME = 5;   // Prevent spiral of death in slow frames
+    const MAX_DELTA_TIME = 200;        // Cap maximum delta time to prevent huge jumps
     let accumulator = 0;
+    let lastStatsUpdate = 0;           // Track when stats were last updated
+    const STATS_UPDATE_INTERVAL = 100; // Update stats every 100ms (10 times per second)
 
     function gameLoop(currentTime) {
         if (gameOver) {
@@ -79,19 +83,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
         animationFrameId = window.requestAnimationFrame(gameLoop);
 
-        // Calculate deltaTime
+        // Calculate deltaTime with maximum cap to prevent huge jumps
         let deltaTime = currentTime - lastRenderTime;
-        if (deltaTime > 1000) deltaTime = FIXED_TIME_STEP; // Prevent huge jumps on tab switch
+        deltaTime = Math.min(deltaTime, MAX_DELTA_TIME);
+        
         accumulator += deltaTime;
         lastRenderTime = currentTime;
 
-        // Update UI stats periodically
-        updateStats();
+        // Update UI stats periodically instead of every frame
+        if (currentTime - lastStatsUpdate > STATS_UPDATE_INTERVAL) {
+            updateStats();
+            lastStatsUpdate = currentTime;
+        }
 
-        // Fixed time step update
-        while (accumulator >= FIXED_TIME_STEP) {
+        // Fixed time step update with maximum updates per frame to prevent spiral of death
+        let updatesThisFrame = 0;
+        while (accumulator >= FIXED_TIME_STEP && updatesThisFrame < MAX_UPDATES_PER_FRAME) {
             GameState.update(currentTime, FIXED_TIME_STEP);
             accumulator -= FIXED_TIME_STEP;
+            updatesThisFrame++;
+        }
+        
+        // If we hit the update cap, drain any excess accumulator time
+        if (updatesThisFrame >= MAX_UPDATES_PER_FRAME && accumulator >= FIXED_TIME_STEP) {
+            accumulator = 0;
         }
 
         // Get updated state and check for game over
@@ -103,7 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // Draw everything (no interpolation for now, but could be added)
+        // Draw everything
         Renderer.drawGame(updatedState, gridSize, halfGridSize);
     }
     
@@ -121,7 +136,9 @@ document.addEventListener('DOMContentLoaded', () => {
         updateStats();
         
         // Restart the game loop
-        lastRenderTime = performance.now();
+        const now = performance.now();
+        lastRenderTime = now;
+        lastStatsUpdate = now;
         animationFrameId = window.requestAnimationFrame(gameLoop);
         
         // Don't play sound on initial load (only on user-initiated restart)
@@ -159,7 +176,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 animationFrameId = undefined;
             }
         } else if (!gameOver) {
-            lastRenderTime = performance.now();
+            const now = performance.now();
+            lastRenderTime = now;
+            lastStatsUpdate = now;
             animationFrameId = window.requestAnimationFrame(gameLoop);
         }
     }
