@@ -4,6 +4,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Animation frame ID for proper cleanup
     let animationFrameId;
     
+    // Initialize settings
+    if (typeof Settings !== 'undefined') {
+        Settings.init();
+    }
+    
     // Initialize game components
     const { gridSize, tileCount, halfGridSize } = GameState.init();
     
@@ -126,6 +131,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const updatedState = GameState.getState();
         if (updatedState.gameOver) {
             gameOver = true;
+            
+            // Store the score as high score if settings available
+            if (typeof Settings !== 'undefined') {
+                Settings.addHighScore(updatedState.score);
+            }
+            
             if (typeof SoundManager !== 'undefined') {
                 SoundManager.play('death');
             }

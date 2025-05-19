@@ -5,9 +5,9 @@ const GameState = (() => {
     const scoreElement = document.getElementById('score');
     
     // Game configuration
-    const gridSize = 20;
-    const tileCount = 400 / gridSize; // Canvas is 400x400
-    const halfGridSize = gridSize / 2;
+    let gridSize = 20;
+    let tileCount = 400 / gridSize; // Canvas is 400x400
+    let halfGridSize = gridSize / 2;
     
     // Power-up configuration
     const POWER_UP_TYPES = {
@@ -144,12 +144,44 @@ const GameState = (() => {
     
     // Initialize the game state
     function init() {
+        // Apply settings if available
+        applySettings();
+        
         resetState();
         return {
             gridSize,
             tileCount,
             halfGridSize
         };
+    }
+    
+    // Apply settings to the game state
+    function applySettings() {
+        if (typeof Settings !== 'undefined') {
+            const numericValues = Settings.getNumericValues();
+            const settings = Settings.getSettings();
+            
+            // Apply grid size setting
+            if (numericValues.gridSize) {
+                gridSize = numericValues.gridSize;
+                tileCount = 400 / gridSize;
+                halfGridSize = gridSize / 2;
+            }
+            
+            // Apply game speed setting
+            if (numericValues.gameSpeed) {
+                state.gameSpeed = numericValues.gameSpeed;
+                state.baseSpeed = numericValues.gameSpeed;
+            }
+            
+            // Apply sound setting
+            if (typeof SoundManager !== 'undefined') {
+                const currentSoundEnabled = SoundManager.isSoundEnabled();
+                if (currentSoundEnabled !== settings.soundEnabled) {
+                    SoundManager.toggleSound();
+                }
+            }
+        }
     }
     
     // Reset the game state
@@ -168,8 +200,17 @@ const GameState = (() => {
         state.moveCount = 0;
         state.score = 0;
         state.gameOver = false;
-        state.gameSpeed = 150;
-        state.baseSpeed = 150;
+        
+        // Apply game speed from settings if available
+        if (typeof Settings !== 'undefined') {
+            const numericValues = Settings.getNumericValues();
+            state.gameSpeed = numericValues.gameSpeed;
+            state.baseSpeed = numericValues.gameSpeed;
+        } else {
+            state.gameSpeed = 150;
+            state.baseSpeed = 150;
+        }
+        
         state.powerUps = [];
         state.activePowerUps = [];
         state.comboCount = 0;

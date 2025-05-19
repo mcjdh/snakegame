@@ -160,22 +160,194 @@ const InputHandler = (() => {
         const restartButton = document.getElementById('restartButton');
         restartButton.addEventListener('click', resetCallback);
         
-        // Add sound toggle button
-        const soundToggleBtn = document.getElementById('soundToggle');
-        if (soundToggleBtn) {
-            soundToggleBtn.addEventListener('click', toggleSound);
+        // Setup settings button
+        const settingsButton = document.getElementById('settingsButton');
+        if (settingsButton) {
+            settingsButton.addEventListener('click', openSettings);
+        }
+        
+        // Setup settings modal controls
+        setupSettingsControls();
+    }
+    
+    // Setup settings related controls
+    function setupSettingsControls() {
+        // Close button for modal
+        const closeModal = document.querySelector('.close-modal');
+        if (closeModal) {
+            closeModal.addEventListener('click', closeSettings);
+        }
+        
+        // Save settings button
+        const saveSettingsButton = document.getElementById('saveSettingsButton');
+        if (saveSettingsButton) {
+            saveSettingsButton.addEventListener('click', saveSettings);
+        }
+        
+        // Reset scores button
+        const resetScoresButton = document.getElementById('resetScoresButton');
+        if (resetScoresButton) {
+            resetScoresButton.addEventListener('click', resetHighScores);
+        }
+        
+        // Sound toggle in settings
+        const soundToggle = document.getElementById('soundToggle');
+        if (soundToggle) {
+            soundToggle.addEventListener('change', toggleSoundFromSettings);
+            
+            // Initialize sound toggle with current setting
+            if (typeof Settings !== 'undefined' && typeof SoundManager !== 'undefined') {
+                soundToggle.checked = SoundManager.isSoundEnabled();
+            }
+        }
+        
+        // Initialize settings UI with current values
+        initSettingsUI();
+        
+        // Close modal when clicking outside
+        window.addEventListener('click', (e) => {
+            const modal = document.getElementById('settingsModal');
+            if (e.target === modal) {
+                closeSettings();
+            }
+        });
+    }
+    
+    // Initialize settings UI with current values
+    function initSettingsUI() {
+        if (typeof Settings === 'undefined') return;
+        
+        const currentSettings = Settings.getSettings();
+        
+        // Set game speed dropdown
+        const gameSpeedSelect = document.getElementById('gameSpeed');
+        if (gameSpeedSelect) {
+            gameSpeedSelect.value = currentSettings.gameSpeed;
+        }
+        
+        // Set grid size dropdown
+        const gridSizeSelect = document.getElementById('gridSize');
+        if (gridSizeSelect) {
+            gridSizeSelect.value = currentSettings.gridSize;
+        }
+        
+        // Set sound toggle
+        const soundToggle = document.getElementById('soundToggle');
+        if (soundToggle) {
+            soundToggle.checked = currentSettings.soundEnabled;
         }
     }
     
-    // Toggle sound
+    // Open settings modal
+    function openSettings() {
+        const modal = document.getElementById('settingsModal');
+        if (modal) {
+            modal.style.display = 'block';
+            initSettingsUI(); // Make sure UI reflects current settings
+        }
+    }
+    
+    // Close settings modal
+    function closeSettings() {
+        const modal = document.getElementById('settingsModal');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+    }
+    
+    // Save settings
+    function saveSettings() {
+        if (typeof Settings === 'undefined') {
+            closeSettings();
+            return;
+        }
+        
+        // Get values from form
+        const gameSpeed = document.getElementById('gameSpeed').value;
+        const gridSize = document.getElementById('gridSize').value;
+        const soundEnabled = document.getElementById('soundToggle').checked;
+        
+        // Update settings
+        const newSettings = {
+            gameSpeed,
+            gridSize,
+            soundEnabled
+        };
+        
+        // Save settings
+        Settings.updateSettings(newSettings);
+        
+        // Apply immediate settings
+        applyImmediateSettings(newSettings);
+        
+        // Close modal
+        closeSettings();
+    }
+    
+    // Apply settings that can be changed immediately
+    function applyImmediateSettings(newSettings) {
+        // Apply sound setting immediately
+        if (typeof SoundManager !== 'undefined' && newSettings.soundEnabled !== undefined) {
+            const currentSoundEnabled = SoundManager.isSoundEnabled();
+            if (currentSoundEnabled !== newSettings.soundEnabled) {
+                SoundManager.toggleSound();
+            }
+        }
+        
+        // Game speed and grid size requires restart
+        if (newSettings.gameSpeed !== undefined || newSettings.gridSize !== undefined) {
+            // Show notification that restart is needed
+            showRestartNeededNotification();
+        }
+    }
+    
+    // Show notification that restart is needed
+    function showRestartNeededNotification() {
+        // Create notification element
+        const notification = document.createElement('div');
+        notification.className = 'power-up-notification';
+        notification.textContent = 'Restart game to apply all settings';
+        document.body.appendChild(notification);
+        
+        // Remove after 3 seconds
+        setTimeout(() => {
+            notification.classList.add('fade-out');
+            setTimeout(() => {
+                document.body.removeChild(notification);
+            }, 500);
+        }, 3000);
+    }
+    
+    // Reset high scores
+    function resetHighScores() {
+        if (typeof Settings !== 'undefined') {
+            Settings.resetHighScores();
+            
+            // Show confirmation
+            alert('High scores have been reset!');
+        }
+    }
+    
+    // Toggle sound from settings UI
+    function toggleSoundFromSettings() {
+        if (typeof SoundManager !== 'undefined') {
+            SoundManager.toggleSound();
+            
+            // Play test sound if enabled
+            if (SoundManager.isSoundEnabled()) {
+                SoundManager.play('powerUp');
+            }
+        }
+    }
+    
+    // Toggle sound from button
     function toggleSound() {
         if (typeof SoundManager !== 'undefined') {
             const isEnabled = SoundManager.toggleSound();
-            const soundToggleBtn = document.getElementById('soundToggle');
             
-            if (soundToggleBtn) {
-                soundToggleBtn.textContent = isEnabled ? 'Sound: ON' : 'Sound: OFF';
-                soundToggleBtn.classList.toggle('sound-off', !isEnabled);
+            // Update settings
+            if (typeof Settings !== 'undefined') {
+                Settings.updateSettings({ soundEnabled: isEnabled });
             }
             
             // Play test sound if enabled
@@ -201,10 +373,39 @@ const InputHandler = (() => {
         const restartButton = document.getElementById('restartButton');
         restartButton.removeEventListener('click', resetCallback);
         
-        const soundToggleBtn = document.getElementById('soundToggle');
-        if (soundToggleBtn) {
-            soundToggleBtn.removeEventListener('click', toggleSound);
+        // Clean up settings related event listeners
+        const settingsButton = document.getElementById('settingsButton');
+        if (settingsButton) {
+            settingsButton.removeEventListener('click', openSettings);
         }
+        
+        const closeModal = document.querySelector('.close-modal');
+        if (closeModal) {
+            closeModal.removeEventListener('click', closeSettings);
+        }
+        
+        const saveSettingsButton = document.getElementById('saveSettingsButton');
+        if (saveSettingsButton) {
+            saveSettingsButton.removeEventListener('click', saveSettings);
+        }
+        
+        const resetScoresButton = document.getElementById('resetScoresButton');
+        if (resetScoresButton) {
+            resetScoresButton.removeEventListener('click', resetHighScores);
+        }
+        
+        const soundToggle = document.getElementById('soundToggle');
+        if (soundToggle) {
+            soundToggle.removeEventListener('change', toggleSoundFromSettings);
+        }
+        
+        // Remove window click handler for modal
+        window.removeEventListener('click', (e) => {
+            const modal = document.getElementById('settingsModal');
+            if (e.target === modal) {
+                closeSettings();
+            }
+        });
     }
     
     return {

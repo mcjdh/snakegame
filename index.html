@@ -37,7 +37,7 @@
         <div class="controls">
             <div class="button-row">
                 <button id="restartButton">Restart Game</button>
-                <button id="soundToggle" class="sound-toggle">Sound: ON</button>
+                <button id="settingsButton">Settings</button>
             </div>
         </div>
         <div class="touch-controls">
@@ -46,12 +46,57 @@
             <div class="touch-btn right">➡️</div>
             <div class="touch-btn down">⬇️</div>
         </div>
+        
+        <!-- Settings Modal -->
+        <div id="settingsModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Settings</h2>
+                    <span class="close-modal">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <div class="settings-group">
+                        <label for="gameSpeed">Game Speed:</label>
+                        <select id="gameSpeed" name="gameSpeed">
+                            <option value="slow">Slow</option>
+                            <option value="normal" selected>Normal</option>
+                            <option value="fast">Fast</option>
+                        </select>
+                    </div>
+                    <div class="settings-group">
+                        <label for="gridSize">Grid Size:</label>
+                        <select id="gridSize" name="gridSize">
+                            <option value="small">Small (16x16)</option>
+                            <option value="medium" selected>Medium (20x20)</option>
+                            <option value="large">Large (25x25)</option>
+                        </select>
+                    </div>
+                    <div class="settings-group">
+                        <label for="soundToggle">Sound:</label>
+                        <div class="toggle-switch">
+                            <input type="checkbox" id="soundToggle" checked>
+                            <label for="soundToggle" class="toggle-label"></label>
+                        </div>
+                    </div>
+                    <div class="settings-group">
+                        <button id="resetScoresButton" class="danger-button">Reset High Scores</button>
+                    </div>
+                    <div class="settings-info">
+                        Note: Some settings will be applied after restarting the game.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="saveSettingsButton">Save Settings</button>
+                </div>
+            </div>
+        </div>
     </div>
     
     <!-- Load modules in the correct order -->
     <script src="js/utils.js"></script>
     <script src="js/sound.js"></script>
     <script src="js/particleSystem.js"></script> <!-- Added particle system -->
+    <script src="js/settings.js"></script> <!-- Added settings module -->
     <script src="js/renderer.js"></script>
     <script src="js/gameState.js"></script>
     <script src="js/zones.js"></script>
