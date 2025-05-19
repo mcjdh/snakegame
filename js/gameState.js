@@ -286,17 +286,28 @@ const GameState = (() => {
     }
 
     // Track the snake's recent positions for trail visualization
+    // Optimized to reduce object creation and limit frequency
+    let lastTrackTime = 0;
+    const TRACK_INTERVAL = 50; // Only track every 50ms (20 times per second)
+    
     function trackSnakePosition(currentTime) {
-        if (state.snake.length > 0) {
-            // Use object pooling for position objects
-            const newPos = PositionManager.getPosition(state.snake[0].x, state.snake[0].y, currentTime);
-            state.lastPositions.unshift(newPos);
-            
-            // Limit the number of positions we track
-            while (state.lastPositions.length > state.maxTrailLength) {
-                const oldPos = state.lastPositions.pop();
-                PositionManager.recyclePosition(oldPos);
-            }
+        if (state.snake.length === 0) return;
+        
+        // Limit tracking frequency to reduce object creation
+        if (currentTime - lastTrackTime < TRACK_INTERVAL) {
+            return;
+        }
+        
+        lastTrackTime = currentTime;
+        
+        // Use object pooling for position objects
+        const newPos = PositionManager.getPosition(state.snake[0].x, state.snake[0].y, currentTime);
+        state.lastPositions.unshift(newPos);
+        
+        // Limit the number of positions we track
+        while (state.lastPositions.length > state.maxTrailLength) {
+            const oldPos = state.lastPositions.pop();
+            PositionManager.recyclePosition(oldPos);
         }
     }
     
@@ -673,11 +684,14 @@ const GameState = (() => {
         }
     }
     
-    // Update particles (new)
+    // Update particles - optimized for performance
     function updateParticles() {
         if (state.particles.length === 0) return;
         
-        for (let i = state.particles.length - 1; i >= 0; i--) {
+        // Use a single loop and truncate the array directly for better performance
+        let validParticleCount = 0;
+        
+        for (let i = 0; i < state.particles.length; i++) {
             const p = state.particles[i];
             
             // Update position
@@ -687,10 +701,19 @@ const GameState = (() => {
             // Update alpha
             p.alpha -= p.decay;
             
-            // Remove dead particles
-            if (p.alpha <= 0) {
-                state.particles.splice(i, 1);
+            // Keep live particles
+            if (p.alpha > 0) {
+                // If we've removed particles, move this particle to its new position
+                if (validParticleCount !== i) {
+                    state.particles[validParticleCount] = p;
+                }
+                validParticleCount++;
             }
+        }
+        
+        // Truncate the array if we've removed particles
+        if (validParticleCount < state.particles.length) {
+            state.particles.length = validParticleCount;
         }
     }
     

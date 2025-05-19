@@ -85,7 +85,7 @@ const Renderer = (() => {
         };
     }
     
-    // Draw the entire game
+    // Draw the entire game with optimized performance
     function drawGame(gameState, gridSize, halfGridSize) {
         const { snake, food, forbiddenZones, lastPositions, powerUps, activePowerUps, 
                 zonePattern, score, gameOver, gameSpeed, snakeSpeed, particles, 
@@ -97,40 +97,58 @@ const Renderer = (() => {
         offscreenCtx.fillRect(0, 0, canvas.width, canvas.height);
         
         // Apply screen shake if active
+        let shakeApplied = false;
         if (shake && (shake.x !== 0 || shake.y !== 0)) {
             offscreenCtx.save();
             offscreenCtx.translate(shake.x, shake.y);
+            shakeApplied = true;
         }
         
         // Draw grid by copying from pre-rendered canvas
         offscreenCtx.drawImage(gridCanvas, 0, 0);
         
         // Draw subtle trail to show recent movement
-        drawTrail(lastPositions, currentTime, gridSize);
+        if (lastPositions && lastPositions.length > 1) {
+            drawTrail(lastPositions, currentTime, gridSize);
+        }
         
         // Draw safety indicators when zones are about to decay
-        drawSafetyIndicators(forbiddenZones, currentTime, gridSize);
+        if (forbiddenZones && forbiddenZones.length > 5) {
+            drawSafetyIndicators(forbiddenZones, currentTime, gridSize);
+        }
         
-        // Draw forbidden zones
-        drawForbiddenZones(forbiddenZones, gridSize);
+        // Draw forbidden zones - only if there are any
+        if (forbiddenZones && forbiddenZones.length > 0) {
+            drawForbiddenZones(forbiddenZones, gridSize);
+        }
         
-        // Draw particles
-        drawParticles(particles);
+        // Draw particles - only if there are any
+        if (particles && particles.length > 0) {
+            drawParticles(particles);
+        }
         
-        // Draw power-ups
-        drawPowerUps(powerUps, gridSize, halfGridSize);
+        // Draw power-ups - only if there are any
+        if (powerUps && powerUps.length > 0) {
+            drawPowerUps(powerUps, gridSize, halfGridSize);
+        }
         
-        // Draw food with type variation
-        drawFood(food, gridSize, halfGridSize);
+        // Draw food
+        if (food) {
+            drawFood(food, gridSize, halfGridSize);
+        }
         
-        // Draw snake with active effects
-        drawSnake(snake, snakeSpeed, gridSize, halfGridSize, activePowerUps);
+        // Draw snake
+        if (snake && snake.length > 0) {
+            drawSnake(snake, snakeSpeed, gridSize, halfGridSize, activePowerUps);
+        }
         
         // Draw game mode info and current level
-        drawGameInfo(zonePattern, gameState.level, gameState.levelName, gameState.isPowerUpActive ? gameState.isPowerUpActive : () => false);
+        drawGameInfo(zonePattern, level, levelName, gameState.isPowerUpActive ? gameState.isPowerUpActive : () => false);
         
-        // Draw active power-up indicators
-        drawPowerUpIndicators(activePowerUps, currentTime);
+        // Draw active power-up indicators - only if there are any active
+        if (activePowerUps && activePowerUps.length > 0) {
+            drawPowerUpIndicators(activePowerUps, currentTime);
+        }
         
         // Draw combo indicator if combo is active
         if (comboCount > 1) {
@@ -146,7 +164,7 @@ const Renderer = (() => {
         ctx.drawImage(offscreenCanvas, 0, 0);
         
         // Reset any transformations 
-        if (shake && (shake.x !== 0 || shake.y !== 0)) {
+        if (shakeApplied) {
             offscreenCtx.restore();
         }
     }
@@ -199,11 +217,20 @@ const Renderer = (() => {
         }
     }
     
-    // Draw forbidden zones
+    // Draw forbidden zones with batching for improved performance
     function drawForbiddenZones(forbiddenZones, gridSize) {
+        if (forbiddenZones.length === 0) return;
+        
         offscreenCtx.save();
+        
+        // Group zones by color and opacity for batched rendering
+        const zonesByStyle = {};
+        const highDangerZones = [];
+        const currentTime = performance.now();
+        
         for (let i = 0; i < forbiddenZones.length; i++) {
             const zone = forbiddenZones[i];
+            
             // Base color is red, but new zones "flash" briefly
             let zoneOpacity = zone.opacity;
             
@@ -211,59 +238,125 @@ const Renderer = (() => {
             let zoneColor;
             if (zone.dangerLevel === 'high') {
                 zoneColor = zone.isNew ? 'rgba(255, 50, 50, ' : 'rgba(239, 35, 35, ';
+                highDangerZones.push(zone); // Track high danger zones for special effects
             } else {
                 zoneColor = zone.isNew ? 'rgba(255, 100, 100, ' : 'rgba(239, 68, 68, ';
             }
-            offscreenCtx.fillStyle = zoneColor + zoneOpacity + ")";
             
-            offscreenCtx.fillRect(
-                zone.x * gridSize,
-                zone.y * gridSize,
-                gridSize,
-                gridSize
-            );
+            const styleKey = zoneColor + zoneOpacity + ")";
+            if (!zonesByStyle[styleKey]) {
+                zonesByStyle[styleKey] = [];
+            }
             
-            // Add X pattern with improved visual effect
-            offscreenCtx.strokeStyle = `rgba(255, 255, 255, ${zoneOpacity})`;
-            offscreenCtx.lineWidth = zone.dangerLevel === 'high' ? 3 : 2;
+            zonesByStyle[styleKey].push(zone);
+        }
+        
+        // Draw zones in batches by style
+        for (const styleKey in zonesByStyle) {
+            const zones = zonesByStyle[styleKey];
+            offscreenCtx.fillStyle = styleKey;
+            
+            // Draw zone rectangles in a batch
+            for (let i = 0; i < zones.length; i++) {
+                const zone = zones[i];
+                offscreenCtx.fillRect(
+                    zone.x * gridSize,
+                    zone.y * gridSize,
+                    gridSize,
+                    gridSize
+                );
+            }
+        }
+        
+        // Draw X patterns in batches by zone type
+        const normalZones = forbiddenZones.filter(z => z.dangerLevel !== 'high');
+        const dangerZones = forbiddenZones.filter(z => z.dangerLevel === 'high');
+        
+        // Draw normal zone X patterns
+        if (normalZones.length > 0) {
+            offscreenCtx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+            offscreenCtx.lineWidth = 2;
             offscreenCtx.beginPath();
-            offscreenCtx.moveTo(zone.x * gridSize + 4, zone.y * gridSize + 4);
-            offscreenCtx.lineTo((zone.x + 1) * gridSize - 4, (zone.y + 1) * gridSize - 4);
-            offscreenCtx.moveTo((zone.x + 1) * gridSize - 4, zone.y * gridSize + 4);
-            offscreenCtx.lineTo(zone.x * gridSize + 4, (zone.y + 1) * gridSize - 4);
+            
+            for (let i = 0; i < normalZones.length; i++) {
+                const zone = normalZones[i];
+                offscreenCtx.moveTo(zone.x * gridSize + 4, zone.y * gridSize + 4);
+                offscreenCtx.lineTo((zone.x + 1) * gridSize - 4, (zone.y + 1) * gridSize - 4);
+                offscreenCtx.moveTo((zone.x + 1) * gridSize - 4, zone.y * gridSize + 4);
+                offscreenCtx.lineTo(zone.x * gridSize + 4, (zone.y + 1) * gridSize - 4);
+            }
+            
+            offscreenCtx.stroke();
+        }
+        
+        // Draw high danger zone X patterns 
+        if (dangerZones.length > 0) {
+            offscreenCtx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+            offscreenCtx.lineWidth = 3;
+            offscreenCtx.beginPath();
+            
+            for (let i = 0; i < dangerZones.length; i++) {
+                const zone = dangerZones[i];
+                offscreenCtx.moveTo(zone.x * gridSize + 4, zone.y * gridSize + 4);
+                offscreenCtx.lineTo((zone.x + 1) * gridSize - 4, (zone.y + 1) * gridSize - 4);
+                offscreenCtx.moveTo((zone.x + 1) * gridSize - 4, zone.y * gridSize + 4);
+                offscreenCtx.lineTo(zone.x * gridSize + 4, (zone.y + 1) * gridSize - 4);
+            }
+            
             offscreenCtx.stroke();
             
             // Add extra warning pulse for high danger zones
-            if (zone.dangerLevel === 'high') {
-                const pulsePhase = (performance.now() % 1000) / 1000;
-                const pulseSize = Math.sin(pulsePhase * Math.PI * 2) * 3;
-                
-                offscreenCtx.strokeStyle = `rgba(255, 255, 255, ${zoneOpacity * 0.5})`;
-                offscreenCtx.beginPath();
-                offscreenCtx.roundRect(
-                    zone.x * gridSize - pulseSize,
-                    zone.y * gridSize - pulseSize,
-                    gridSize + pulseSize * 2,
-                    gridSize + pulseSize * 2,
-                    3 + pulseSize
-                );
-                offscreenCtx.stroke();
+            // Use a single pulse phase for all zones to improve performance
+            const pulsePhase = (currentTime % 1000) / 1000;
+            const pulseSize = Math.sin(pulsePhase * Math.PI * 2) * 3;
+            
+            if (pulseSize > 0) {  // Only draw when pulse is visible
+                offscreenCtx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+                for (let i = 0; i < dangerZones.length; i++) {
+                    const zone = dangerZones[i];
+                    offscreenCtx.beginPath();
+                    offscreenCtx.roundRect(
+                        zone.x * gridSize - pulseSize,
+                        zone.y * gridSize - pulseSize,
+                        gridSize + pulseSize * 2,
+                        gridSize + pulseSize * 2,
+                        3 + pulseSize
+                    );
+                    offscreenCtx.stroke();
+                }
             }
         }
+        
         offscreenCtx.restore();
     }
     
-    // Draw particles
+    // Draw particles with batching for improved performance
     function drawParticles(particles) {
         if (!particles || particles.length === 0) return;
         
+        // Group particles by color for batched rendering
+        const particlesByColor = {};
+        
         for (let i = 0; i < particles.length; i++) {
             const p = particles[i];
-            offscreenCtx.globalAlpha = p.alpha;
-            offscreenCtx.fillStyle = p.color;
-            offscreenCtx.beginPath();
-            offscreenCtx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-            offscreenCtx.fill();
+            if (!particlesByColor[p.color]) {
+                particlesByColor[p.color] = [];
+            }
+            particlesByColor[p.color].push(p);
+        }
+        
+        // Draw particles in batches by color
+        for (const color in particlesByColor) {
+            const batch = particlesByColor[color];
+            offscreenCtx.fillStyle = color;
+            
+            for (let i = 0; i < batch.length; i++) {
+                const p = batch[i];
+                offscreenCtx.globalAlpha = p.alpha;
+                offscreenCtx.beginPath();
+                offscreenCtx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                offscreenCtx.fill();
+            }
         }
         
         // Reset alpha
@@ -368,7 +461,7 @@ const Renderer = (() => {
         offscreenCtx.shadowBlur = 0;
     }
     
-    // Draw snake with active effects
+    // Draw snake with active effects - optimized for performance
     function drawSnake(snake, snakeSpeed, gridSize, halfGridSize, activePowerUps) {
         if (!snake || snake.length === 0) return;
         
@@ -377,103 +470,210 @@ const Renderer = (() => {
         const isInvulnerable = activePowerUps && activePowerUps.some(pu => pu.type === 'INVULNERABILITY' && pu.active);
         const hasSpeedBoost = activePowerUps && activePowerUps.some(pu => pu.type === 'SPEED_BOOST' && pu.active);
         
-        // Draw snake body segments with special effects
-        for (let i = 0; i < snake.length; i++) {
-            const segment = snake[i];
-            
-            // Apply special effects
-            if (isInvulnerable) {
-                // Golden snake for invulnerability
-                const hue = (performance.now() / 10 + i * 5) % 360;
+        // Pre-calculate common values
+        const currentTime = performance.now();
+        const segmentSize = gridSize - 2;
+        const cornerRadius = 4;
+        
+        // Special case for invulnerable rainbow effect
+        if (isInvulnerable) {
+            for (let i = 0; i < snake.length; i++) {
+                const segment = snake[i];
+                const hue = (currentTime / 10 + i * 5) % 360;
+                
                 offscreenCtx.fillStyle = `hsl(${hue}, 80%, 60%)`;
-            } else if (isPhasing) {
-                // Semi-transparent ghost effect when phasing
+                offscreenCtx.beginPath();
+                offscreenCtx.roundRect(
+                    segment.x * gridSize, 
+                    segment.y * gridSize, 
+                    segmentSize, 
+                    segmentSize,
+                    cornerRadius
+                );
+                offscreenCtx.fill();
+            }
+        }
+        // Handle phasing effect
+        else if (isPhasing) {
+            for (let i = 0; i < snake.length; i++) {
+                const segment = snake[i];
+                const alpha = i === 0 ? 0.9 : (0.7 - (i / snake.length * 0.3));
+                
+                offscreenCtx.fillStyle = `rgba(74, 222, 128, ${alpha})`;
+                offscreenCtx.beginPath();
+                offscreenCtx.roundRect(
+                    segment.x * gridSize, 
+                    segment.y * gridSize, 
+                    segmentSize, 
+                    segmentSize,
+                    cornerRadius
+                );
+                offscreenCtx.fill();
+            }
+        }
+        // Handle speed boost effect
+        else if (hasSpeedBoost) {
+            // Group segments by color
+            const evenSegments = [];
+            const oddSegments = [];
+            
+            for (let i = 0; i < snake.length; i++) {
                 if (i === 0) {
-                    offscreenCtx.fillStyle = 'rgba(74, 222, 128, 0.9)'; // Head
+                    // Draw head separately
+                    offscreenCtx.fillStyle = '#4ade80';
+                    offscreenCtx.beginPath();
+                    offscreenCtx.roundRect(
+                        snake[i].x * gridSize, 
+                        snake[i].y * gridSize, 
+                        segmentSize, 
+                        segmentSize,
+                        cornerRadius
+                    );
+                    offscreenCtx.fill();
+                } else if (i % 2 === 0) {
+                    evenSegments.push(snake[i]);
                 } else {
-                    const alpha = 0.7 - (i / snake.length * 0.3);
-                    offscreenCtx.fillStyle = `rgba(74, 222, 128, ${alpha})`;
-                }
-            } else if (hasSpeedBoost) {
-                // Energized appearance for speed boost
-                if (i === 0) {
-                    offscreenCtx.fillStyle = '#4ade80'; // Head
-                } else {
-                    // Alternating pattern for speed boost
-                    const factor = (i % 2 === 0) ? 60 : 40;
-                    offscreenCtx.fillStyle = `hsl(142, 76%, ${factor}%)`;
-                }
-            } else {
-                // Normal coloring
-                if (i === 0) {
-                    offscreenCtx.fillStyle = '#4ade80'; // Head
-                } else {
-                    // Body with gradient
-                    offscreenCtx.fillStyle = `hsl(142, 76%, ${70 - (i * 2)}%)`;
+                    oddSegments.push(snake[i]);
                 }
             }
             
-            // Draw segment
-            offscreenCtx.beginPath();
-            offscreenCtx.roundRect(
-                segment.x * gridSize, 
-                segment.y * gridSize, 
-                gridSize - 2, 
-                gridSize - 2,
-                4
-            );
-            offscreenCtx.fill();
-            
-            // Add eye details to the head
-            if (i === 0) {
-                offscreenCtx.fillStyle = '#000';
-                
-                // Position eyes based on direction
-                let eyeOffset;
-                
-                if (snakeSpeed.x === 1) eyeOffset = eyeOffsets.right;
-                else if (snakeSpeed.x === -1) eyeOffset = eyeOffsets.left;
-                else if (snakeSpeed.y === -1) eyeOffset = eyeOffsets.up;
-                else eyeOffset = eyeOffsets.down;
-                
-                // Batch draw both eyes
-                const x1 = segment.x * gridSize + gridSize * eyeOffset.x1;
-                const y1 = segment.y * gridSize + gridSize * eyeOffset.y1;
-                const x2 = segment.x * gridSize + gridSize * eyeOffset.x2;
-                const y2 = segment.y * gridSize + gridSize * eyeOffset.y2;
-                const eyeRadius = gridSize * 0.1;
-                
+            // Draw even segments in batch
+            if (evenSegments.length > 0) {
+                offscreenCtx.fillStyle = 'hsl(142, 76%, 60%)';
                 offscreenCtx.beginPath();
-                offscreenCtx.arc(x1, y1, eyeRadius, 0, Math.PI * 2);
-                offscreenCtx.arc(x2, y2, eyeRadius, 0, Math.PI * 2);
+                for (let i = 0; i < evenSegments.length; i++) {
+                    const segment = evenSegments[i];
+                    offscreenCtx.roundRect(
+                        segment.x * gridSize, 
+                        segment.y * gridSize, 
+                        segmentSize, 
+                        segmentSize,
+                        cornerRadius
+                    );
+                }
                 offscreenCtx.fill();
             }
             
-            // Add trail for speed boost
-            if (hasSpeedBoost && i === 0) {
-                const trailLength = 3;
-                const direction = { x: -snakeSpeed.x, y: -snakeSpeed.y }; // Opposite of movement
-                
-                offscreenCtx.globalAlpha = 0.7;
-                for (let t = 1; t <= trailLength; t++) {
-                    const trailX = segment.x + direction.x * t * 0.5;
-                    const trailY = segment.y + direction.y * t * 0.5;
-                    const alpha = 0.7 - (t / trailLength * 0.6);
-                    const size = gridSize - 2 - (t * 3);
-                    
-                    offscreenCtx.fillStyle = `rgba(74, 222, 128, ${alpha})`;
-                    offscreenCtx.beginPath();
+            // Draw odd segments in batch
+            if (oddSegments.length > 0) {
+                offscreenCtx.fillStyle = 'hsl(142, 76%, 40%)';
+                offscreenCtx.beginPath();
+                for (let i = 0; i < oddSegments.length; i++) {
+                    const segment = oddSegments[i];
                     offscreenCtx.roundRect(
-                        trailX * gridSize + (gridSize - size) / 2,
-                        trailY * gridSize + (gridSize - size) / 2,
-                        size,
-                        size,
-                        4
+                        segment.x * gridSize, 
+                        segment.y * gridSize, 
+                        segmentSize, 
+                        segmentSize,
+                        cornerRadius
                     );
+                }
+                offscreenCtx.fill();
+            }
+        }
+        // Normal coloring - draw all segments by type
+        else {
+            // Draw the head
+            if (snake.length > 0) {
+                offscreenCtx.fillStyle = '#4ade80';
+                offscreenCtx.beginPath();
+                offscreenCtx.roundRect(
+                    snake[0].x * gridSize, 
+                    snake[0].y * gridSize, 
+                    segmentSize, 
+                    segmentSize,
+                    cornerRadius
+                );
+                offscreenCtx.fill();
+            }
+            
+            // Group body segments by color
+            const bodySegmentsByShade = {};
+            
+            for (let i = 1; i < snake.length; i++) {
+                const segment = snake[i];
+                const shade = 70 - (i * 2);
+                const colorKey = `hsl(142, 76%, ${shade}%)`;
+                
+                if (!bodySegmentsByShade[colorKey]) {
+                    bodySegmentsByShade[colorKey] = [];
+                }
+                bodySegmentsByShade[colorKey].push(segment);
+            }
+            
+            // Draw body segments in batches by color
+            for (const color in bodySegmentsByShade) {
+                const segments = bodySegmentsByShade[color];
+                if (segments.length > 0) {
+                    offscreenCtx.fillStyle = color;
+                    offscreenCtx.beginPath();
+                    
+                    for (let i = 0; i < segments.length; i++) {
+                        const segment = segments[i];
+                        offscreenCtx.roundRect(
+                            segment.x * gridSize, 
+                            segment.y * gridSize, 
+                            segmentSize, 
+                            segmentSize,
+                            cornerRadius
+                        );
+                    }
                     offscreenCtx.fill();
                 }
-                offscreenCtx.globalAlpha = 1.0;
             }
+        }
+        
+        // Add eye details to the head
+        if (snake.length > 0) {
+            const head = snake[0];
+            offscreenCtx.fillStyle = '#000';
+            
+            // Position eyes based on direction
+            let eyeOffset;
+            
+            if (snakeSpeed.x === 1) eyeOffset = eyeOffsets.right;
+            else if (snakeSpeed.x === -1) eyeOffset = eyeOffsets.left;
+            else if (snakeSpeed.y === -1) eyeOffset = eyeOffsets.up;
+            else eyeOffset = eyeOffsets.down;
+            
+            // Batch draw both eyes
+            const x1 = head.x * gridSize + gridSize * eyeOffset.x1;
+            const y1 = head.y * gridSize + gridSize * eyeOffset.y1;
+            const x2 = head.x * gridSize + gridSize * eyeOffset.x2;
+            const y2 = head.y * gridSize + gridSize * eyeOffset.y2;
+            const eyeRadius = gridSize * 0.1;
+            
+            offscreenCtx.beginPath();
+            offscreenCtx.arc(x1, y1, eyeRadius, 0, Math.PI * 2);
+            offscreenCtx.arc(x2, y2, eyeRadius, 0, Math.PI * 2);
+            offscreenCtx.fill();
+        }
+            
+        // Add trail for speed boost
+        if (hasSpeedBoost && snake.length > 0) {
+            const head = snake[0];
+            const trailLength = 3;
+            const direction = { x: -snakeSpeed.x, y: -snakeSpeed.y }; // Opposite of movement
+            
+            offscreenCtx.globalAlpha = 0.7;
+            for (let t = 1; t <= trailLength; t++) {
+                const trailX = head.x + direction.x * t * 0.5;
+                const trailY = head.y + direction.y * t * 0.5;
+                const alpha = 0.7 - (t / trailLength * 0.6);
+                const size = gridSize - 2 - (t * 3);
+                
+                offscreenCtx.fillStyle = `rgba(74, 222, 128, ${alpha})`;
+                offscreenCtx.beginPath();
+                offscreenCtx.roundRect(
+                    trailX * gridSize + (gridSize - size) / 2,
+                    trailY * gridSize + (gridSize - size) / 2,
+                    size,
+                    size,
+                    4
+                );
+                offscreenCtx.fill();
+            }
+            offscreenCtx.globalAlpha = 1.0;
         }
     }
     
