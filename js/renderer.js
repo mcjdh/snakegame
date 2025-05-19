@@ -377,6 +377,41 @@ const Renderer = (() => {
         const isInvulnerable = activePowerUps && activePowerUps.some(pu => pu.type === 'INVULNERABILITY' && pu.active);
         const hasSpeedBoost = activePowerUps && activePowerUps.some(pu => pu.type === 'SPEED_BOOST' && pu.active);
         
+        // Food eaten effect
+        const currentTime = performance.now();
+        const foodEatenEffect = interpolation && interpolation.previousState ? 
+            interpolation.previousState.foodEatenEffect || 
+            (interpolation.previousState.foodEatenTime && currentTime - interpolation.previousState.foodEatenTime < 500) : false;
+        
+        let foodEffectColor = '#ffffff';
+        let pulseIntensity = 0;
+        
+        if (foodEatenEffect) {
+            const timeSinceEaten = currentTime - (interpolation.previousState.foodEatenTime || 0);
+            const foodType = interpolation.previousState.foodEatenType || 'NORMAL';
+            
+            // Calculate pulse effect (starts strong, fades over 500ms)
+            pulseIntensity = Math.max(0, 1 - timeSinceEaten / 500);
+            
+            // Set effect color based on food type
+            switch(foodType) {
+                case 'NORMAL': 
+                    foodEffectColor = '#ef4444';
+                    break;
+                case 'BONUS':
+                    foodEffectColor = '#ff9f1c';
+                    break;
+                case 'SUPER':
+                    foodEffectColor = '#f72585';
+                    break;
+                case 'EPIC':
+                    foodEffectColor = '#7209b7';
+                    break;
+                default:
+                    foodEffectColor = '#ffffff';
+            }
+        }
+        
         // Draw snake body segments with special effects
         for (let i = 0; i < snake.length; i++) {
             let segment = snake[i];
@@ -431,16 +466,44 @@ const Renderer = (() => {
                 }
             }
             
-            // Draw segment
+            // Calculate segment size with pulse effect if food was just eaten
+            let segmentSize = gridSize - 2;
+            let segmentRadius = 4;
+            
+            if (foodEatenEffect && i < 5) { // Apply effect to first 5 segments
+                // Fade effect based on segment position
+                const segmentFade = 1 - (i * 0.2);
+                const pulseFactor = 1 + (pulseIntensity * 0.4 * segmentFade);
+                
+                // Apply pulse effect to size
+                segmentSize = (gridSize - 2) * pulseFactor;
+                
+                // Add glow effect
+                const glowStrength = pulseIntensity * 8 * segmentFade;
+                if (glowStrength > 0) {
+                    offscreenCtx.shadowColor = foodEffectColor;
+                    offscreenCtx.shadowBlur = glowStrength;
+                }
+            }
+            
+            // Draw segment with potential pulse effect
+            const xOffset = (gridSize - segmentSize) / 2;
+            const yOffset = (gridSize - segmentSize) / 2;
+            
             offscreenCtx.beginPath();
             offscreenCtx.roundRect(
-                segment.x * gridSize, 
-                segment.y * gridSize, 
-                gridSize - 2, 
-                gridSize - 2,
-                4
+                segment.x * gridSize + xOffset, 
+                segment.y * gridSize + yOffset, 
+                segmentSize,
+                segmentSize,
+                segmentRadius
             );
             offscreenCtx.fill();
+            
+            // Reset shadow effect
+            if (foodEatenEffect && i < 5) {
+                offscreenCtx.shadowBlur = 0;
+            }
             
             // Add eye details to the head
             if (i === 0) {

@@ -111,6 +111,11 @@ const GameState = (() => {
         maxTrailLength: 10,
         moveCount: 0,
         
+        // Visual effects
+        foodEatenTime: 0,
+        foodEatenEffect: false,
+        foodEatenType: null,
+        
         // Forbidden zones
         forbiddenZones: [],
         forbiddenDuration: 3500,
@@ -739,6 +744,11 @@ const GameState = (() => {
         // Update combo system
         updateComboSystem(currentTime);
         
+        // Reset food eaten effect after 500ms
+        if (state.foodEatenEffect && currentTime - state.foodEatenTime > 500) {
+            state.foodEatenEffect = false;
+        }
+        
         // Move the snake
         moveSnake();
         
@@ -796,6 +806,11 @@ const GameState = (() => {
             
             // Create food collection particles
             createFoodCollectionParticles(state.food.x, state.food.y, foodData.color);
+            
+            // Set food eaten effect
+            state.foodEatenTime = currentTime;
+            state.foodEatenEffect = true;
+            state.foodEatenType = foodType;
             
             // Generate new food
             generateFood();
@@ -895,7 +910,41 @@ const GameState = (() => {
     
     // Set snake direction
     function setDirection(direction) {
-        state.snakeSpeed = direction;
+        // Only create particles if actually changing direction
+        if (direction.x !== state.snakeSpeed.x || direction.y !== state.snakeSpeed.y) {
+            // Update direction first so particles use new direction
+            state.snakeSpeed = direction;
+            // Create particles for direction change
+            createDirectionChangeParticles();
+        } else {
+            state.snakeSpeed = direction;
+        }
+    }
+    
+    // Create direction change particles
+    function createDirectionChangeParticles() {
+        if (state.snake.length === 0) return;
+        
+        const head = state.snake[0];
+        const particleCount = 10;
+        
+        for (let i = 0; i < particleCount; i++) {
+            // Create particles in the direction of movement
+            const angle = Math.atan2(state.snakeSpeed.y, state.snakeSpeed.x) + 
+                        (Math.random() - 0.5) * Math.PI * 0.5; // +/- 45 degrees
+            const speed = 0.5 + Math.random() * 1.5;
+            
+            state.particles.push({
+                x: head.x * gridSize + halfGridSize,
+                y: head.y * gridSize + halfGridSize,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                radius: 1 + Math.random() * 2,
+                color: 'rgba(74, 222, 128, 0.8)', // Semi-transparent green
+                alpha: 0.7,
+                decay: 0.05 + Math.random() * 0.05
+            });
+        }
     }
     
     // Public API
