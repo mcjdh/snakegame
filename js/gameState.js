@@ -231,13 +231,21 @@ const GameState = (() => {
             const randomIndex = Math.floor(Math.random() * availablePositions.length);
             const pos = availablePositions[randomIndex];
             
-            // Select food type based on rarity
+            // Select food type based on rarity and game progression
             const foodTypeRoll = Math.random();
             let accumulatedChance = 0;
             let selectedType = 'NORMAL';
             
+            // Adjust food type chances based on score/level (higher chances for better food as score increases)
+            const foodTypeChances = {
+                NORMAL: Math.max(0.4, 0.7 - (state.level * 0.07)),  // Decreases as level increases
+                BONUS: Math.min(0.4, 0.2 + (state.level * 0.04)),   // Increases with level
+                SUPER: Math.min(0.15, 0.09 + (state.level * 0.015)), // Increases slightly with level
+                EPIC: Math.min(0.05, 0.01 + (state.level * 0.01))   // Increases slightly with level
+            };
+            
             for (const [type, props] of Object.entries(FOOD_TYPES)) {
-                accumulatedChance += props.chance;
+                accumulatedChance += foodTypeChances[type] || props.chance;
                 if (foodTypeRoll <= accumulatedChance) {
                     selectedType = type;
                     break;
@@ -257,9 +265,28 @@ const GameState = (() => {
             }
         } else {
             // Fallback if no positions are available (rare edge case)
+            // Find a position that avoids at least the snake
+            let fallbackX, fallbackY;
+            let attempts = 0;
+            const maxAttempts = 50; // Limit attempts to avoid infinite loop
+            
+            do {
+                fallbackX = Math.floor(Math.random() * tileCount);
+                fallbackY = Math.floor(Math.random() * tileCount);
+                attempts++;
+                
+                // Check if this position would overlap with the snake
+                const wouldOverlapSnake = state.snake.some(segment => 
+                    segment.x === fallbackX && segment.y === fallbackY);
+                
+                if (!wouldOverlapSnake) {
+                    break; // Found a valid position
+                }
+            } while (attempts < maxAttempts);
+            
             state.food = {
-                x: Math.floor(Math.random() * tileCount),
-                y: Math.floor(Math.random() * tileCount),
+                x: fallbackX,
+                y: fallbackY,
                 type: 'NORMAL',
                 pulsePhase: 0
             };
@@ -340,15 +367,31 @@ const GameState = (() => {
             
             // If food is within 5 units, move it 1 step closer to snake
             if (Math.abs(headX - foodX) + Math.abs(headY - foodY) <= 5) {
-                // Move food toward snake
-                if (foodX < headX) state.food.x += 1;
-                else if (foodX > headX) state.food.x -= 1;
+                // Calculate potential new positions
+                let newX = foodX;
+                let newY = foodY;
                 
-                if (foodY < headY) state.food.y += 1;
-                else if (foodY > headY) state.food.y -= 1;
+                if (foodX < headX) newX += 1;
+                else if (foodX > headX) newX -= 1;
                 
-                // Add attraction particle trail
-                createMagnetParticles(foodX, foodY, headX, headY);
+                if (foodY < headY) newY += 1;
+                else if (foodY > headY) newY -= 1;
+                
+                // Check if the new position would overlap with snake or forbidden zone
+                const wouldOverlap = state.snake.some(segment => 
+                    segment.x === newX && segment.y === newY);
+                
+                const wouldOverlapZone = state.forbiddenZones.some(zone => 
+                    zone.x === newX && zone.y === newY);
+                
+                // Only move food if it wouldn't cause overlap
+                if (!wouldOverlap && !wouldOverlapZone) {
+                    state.food.x = newX;
+                    state.food.y = newY;
+                    
+                    // Add attraction particle trail
+                    createMagnetParticles(foodX, foodY, headX, headY);
+                }
             }
         }
     }
@@ -451,6 +494,11 @@ const GameState = (() => {
             return false;
         }
         
+        // Add invulnerability power-up check first (short-circuit other checks)
+        if (isPowerUpActive('INVULNERABILITY')) {
+            return false;
+        }
+        
         const head = state.snake[0];
         
         // Wall collision
@@ -482,11 +530,6 @@ const GameState = (() => {
                     }
                 }
             }
-        }
-        
-        // Add invulnerability power-up check
-        if (isPowerUpActive('INVULNERABILITY')) {
-            return false;
         }
         
         return false;
@@ -544,14 +587,29 @@ const GameState = (() => {
             const randomIndex = Math.floor(Math.random() * availablePositions.length);
             const pos = availablePositions[randomIndex];
             
-            // Select random power-up type based on rarity
+            // Select random power-up type based on rarity and game state
             const powerUpTypes = Object.entries(POWER_UP_TYPES);
+            
+            // Dynamic rarity weights based on game state
             const rarityWeights = {
                 'common': 0.5,
                 'uncommon': 0.3,
                 'rare': 0.15,
                 'epic': 0.05
             };
+            
+            // Adjust weights based on game state
+            if (state.snake.length > 15) {
+                // When snake is long, boost the chance for SHRINK power-up
+                rarityWeights.rare += 0.1;
+                rarityWeights.common -= 0.1;
+            }
+            
+            if (state.forbiddenZones.length > 20) {
+                // When there are many zones, boost chance for CLEAR_PATH and PHASE_THROUGH
+                rarityWeights.uncommon += 0.15;
+                rarityWeights.common -= 0.15;
+            }
             
             // Weight-based selection
             const roll = Math.random();
@@ -679,7 +737,10 @@ const GameState = (() => {
         }
         
         // Occasionally spawn power-ups (1% chance per update, limited to 3 at a time)
-        if (state.powerUps.length < 3 && Math.random() < 0.01) {
+        // Ensure there's enough space for power-ups
+        if (state.powerUps.length < 3 && 
+            Math.random() < 0.01 && 
+            tileCount * tileCount - state.snake.length - state.forbiddenZones.length > 10) {
             spawnPowerUp();
         }
     }
@@ -861,7 +922,8 @@ const GameState = (() => {
                     state.zonePattern, 
                     state.difficultyLevel,
                     state.forbiddenZones,
-                    state.forbiddenDuration
+                    state.forbiddenDuration,
+                    state.snake // Pass snake to prevent zones from spawning on snake
                 );
             }
         }
