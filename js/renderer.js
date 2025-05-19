@@ -594,16 +594,37 @@ const Renderer = (() => {
         offscreenCtx.fillStyle = '#f5f5f5';
         offscreenCtx.font = 'bold 36px "Segoe UI", sans-serif';
         offscreenCtx.textAlign = 'center';
-        offscreenCtx.fillText('Game Over!', canvas.width / 2, canvas.height / 2 - 60);
+        offscreenCtx.fillText('Game Over!', canvas.width / 2, canvas.height / 2 - 100);
         
         // Draw score
         offscreenCtx.font = '24px "Segoe UI", sans-serif';
-        offscreenCtx.fillText(`Score: ${score}`, canvas.width / 2, canvas.height / 2 - 20);
+        offscreenCtx.fillText(`Score: ${score}`, canvas.width / 2, canvas.height / 2 - 60);
+        
+        // Draw high scores if available
+        if (typeof Settings !== 'undefined') {
+            const highScores = Settings.getSettings().highScores;
+            if (highScores && highScores.length > 0) {
+                offscreenCtx.fillStyle = '#ffce1a';
+                offscreenCtx.fillText('High Scores', canvas.width / 2, canvas.height / 2 - 20);
+                
+                offscreenCtx.fillStyle = '#f5f5f5';
+                offscreenCtx.font = '18px "Segoe UI", sans-serif';
+                
+                const displayScores = highScores.slice(0, 3); // Show top 3 scores
+                displayScores.forEach((highScore, index) => {
+                    offscreenCtx.fillText(
+                        `${index + 1}. ${highScore}`, 
+                        canvas.width / 2, 
+                        canvas.height / 2 + 10 + (index * 25)
+                    );
+                });
+            }
+        }
         
         // Draw restart instructions
         offscreenCtx.font = '20px "Segoe UI", sans-serif';
         offscreenCtx.fillStyle = '#4ade80';
-        offscreenCtx.fillText('Press R or Tap Restart', canvas.width / 2, canvas.height / 2 + 40);
+        offscreenCtx.fillText('Press R or Tap Restart', canvas.width / 2, canvas.height / 2 + 80);
     }
     
     // API exposed to other modules
