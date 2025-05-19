@@ -483,6 +483,11 @@ const GameState = (() => {
             return false;
         }
         
+        // Add invulnerability power-up check first (short-circuit other checks)
+        if (isPowerUpActive('INVULNERABILITY')) {
+            return false;
+        }
+        
         const head = state.snake[0];
         
         // Wall collision
@@ -514,11 +519,6 @@ const GameState = (() => {
                     }
                 }
             }
-        }
-        
-        // Add invulnerability power-up check
-        if (isPowerUpActive('INVULNERABILITY')) {
-            return false;
         }
         
         return false;
