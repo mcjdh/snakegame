@@ -181,24 +181,34 @@ const Renderer = (() => {
         }
     }
     
-    // Draw the movement trail
+    // Draw the movement trail like leaves/petals falling
     function drawTrail(lastPositions, currentTime, gridSize) {
         if (lastPositions.length > 1) {
             for (let i = 1; i < lastPositions.length; i++) {
                 const pos = lastPositions[i];
                 const age = currentTime - pos.time;
                 const alpha = Math.max(0, 0.15 - (age / 2000) * 0.15); // Fade out based on age
+                const rotation = (pos.x * 7 + pos.y * 13) % 360; // Deterministic rotation based on position
                 
-                offscreenCtx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
-                offscreenCtx.beginPath();
-                offscreenCtx.roundRect(
-                    pos.x * gridSize + gridSize * 0.35, 
-                    pos.y * gridSize + gridSize * 0.35, 
-                    gridSize * 0.3, 
-                    gridSize * 0.3,
-                    3
+                // Use green leaf-like shapes instead of simple squares
+                offscreenCtx.save();
+                offscreenCtx.translate(
+                    pos.x * gridSize + gridSize * 0.5, 
+                    pos.y * gridSize + gridSize * 0.5
                 );
+                offscreenCtx.rotate((rotation * Math.PI) / 180);
+                
+                offscreenCtx.fillStyle = `rgba(110, 162, 117, ${alpha})`;
+                offscreenCtx.beginPath();
+                
+                // Draw a simple leaf shape
+                const size = gridSize * 0.25;
+                offscreenCtx.moveTo(0, -size);
+                offscreenCtx.bezierCurveTo(size, -size/2, size, size/2, 0, size);
+                offscreenCtx.bezierCurveTo(-size, size/2, -size, -size/2, 0, -size);
                 offscreenCtx.fill();
+                
+                offscreenCtx.restore();
             }
         }
     }
@@ -632,26 +642,34 @@ const Renderer = (() => {
         }
     }
     
-    // Draw game mode info and level
+    // Draw game mode info and level with natural theme
     function drawGameInfo(zonePattern, level, levelName, isPowerUpActive) {
-        offscreenCtx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+        // Create a semi-transparent wooden panel for text
+        offscreenCtx.fillStyle = 'rgba(69, 50, 38, 0.7)';
+        offscreenCtx.beginPath();
+        offscreenCtx.roundRect(5, 5, 200, 20, 3);
+        offscreenCtx.fill();
+        
+        // Draw text with leaf-green color
+        offscreenCtx.fillStyle = 'rgba(181, 214, 167, 0.9)';
         offscreenCtx.font = '12px "Segoe UI", sans-serif';
         offscreenCtx.textAlign = 'left';
         
+        // Get nature-themed pattern names
         let patternName;
         switch(zonePattern) {
-            case 'alternate': patternName = "Sparse"; break;
-            case 'continuous': patternName = "Dense"; break;
-            case 'random': patternName = "Chaotic"; break;
+            case 'alternate': patternName = "Meadow"; break;
+            case 'continuous': patternName = "Forest"; break;
+            case 'random': patternName = "Wild"; break;
         }
         
         // Show level and active effects
         let statusText = `Level ${level+1}: ${levelName} - ${patternName}`;
         
-        offscreenCtx.fillText(statusText, 10, 15);
+        offscreenCtx.fillText(statusText, 10, 19);
     }
     
-    // Draw combo indicator
+    // Draw combo indicator with natural theme
     function drawComboIndicator(comboCount, multiplier) {
         offscreenCtx.save();
         
@@ -659,20 +677,52 @@ const Renderer = (() => {
         const x = canvas.width - 10;
         const y = 30;
         
-        // Draw background
-        offscreenCtx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        // Draw wooden background with grain
+        offscreenCtx.fillStyle = 'rgba(69, 50, 38, 0.8)';
         offscreenCtx.beginPath();
         offscreenCtx.roundRect(x - 90, y - 20, 90, 30, 5);
         offscreenCtx.fill();
         
-        // Draw text
-        offscreenCtx.fillStyle = '#ffd60a';
+        // Add wood grain texture
+        offscreenCtx.strokeStyle = 'rgba(90, 65, 50, 0.5)';
+        offscreenCtx.lineWidth = 0.5;
+        for (let i = 0; i < 2; i++) {
+            offscreenCtx.beginPath();
+            offscreenCtx.moveTo(x - 85, y - 15 + i * 15);
+            offscreenCtx.bezierCurveTo(
+                x - 65, y - 13 + i * 15 + Math.sin(i) * 3,
+                x - 35, y - 17 + i * 15 - Math.sin(i + 1) * 3,
+                x - 15, y - 15 + i * 15
+            );
+            offscreenCtx.stroke();
+        }
+        
+        // Add leaf decoration
+        const leafX = x - 85;
+        const leafY = y - 5;
+        offscreenCtx.fillStyle = 'rgba(91, 164, 95, 0.5)';
+        offscreenCtx.beginPath();
+        offscreenCtx.moveTo(leafX, leafY);
+        offscreenCtx.bezierCurveTo(
+            leafX + 5, leafY - 5,
+            leafX + 10, leafY - 8,
+            leafX + 15, leafY
+        );
+        offscreenCtx.bezierCurveTo(
+            leafX + 10, leafY + 3,
+            leafX + 5, leafY + 5,
+            leafX, leafY
+        );
+        offscreenCtx.fill();
+        
+        // Draw text with warm golden color like sunlight
+        offscreenCtx.fillStyle = '#e9c46a';
         offscreenCtx.font = 'bold 16px "Segoe UI", sans-serif';
         offscreenCtx.textAlign = 'right';
         offscreenCtx.fillText(`Combo: ${comboCount}x`, x - 10, y);
         
         // Draw multiplier
-        offscreenCtx.fillStyle = '#4ade80';
+        offscreenCtx.fillStyle = '#6dbc78';
         offscreenCtx.font = '12px "Segoe UI", sans-serif';
         offscreenCtx.fillText(`x${multiplier.toFixed(1)}`, x - 10, y + 15);
         
