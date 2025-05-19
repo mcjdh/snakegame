@@ -122,8 +122,8 @@ const Renderer = (() => {
                 shake, level, levelName, comboCount, multiplier } = gameState;
         const currentTime = performance.now();
         
-        // Clear offscreen canvas
-        offscreenCtx.fillStyle = '#1e1e1e';
+        // Clear offscreen canvas with natural forest green background
+        offscreenCtx.fillStyle = '#2a523d'; // Dark forest green
         offscreenCtx.fillRect(0, 0, canvas.width, canvas.height);
         
         // Apply screen shake if active
@@ -203,7 +203,7 @@ const Renderer = (() => {
         }
     }
     
-    // Draw visual indicators for zones that are about to decay
+    // Draw visual indicators for zones that are about to decay (natural theme - like moss growing)
     function drawSafetyIndicators(forbiddenZones, currentTime, gridSize) {
         if (forbiddenZones.length > 5) {
             for (let i = 0; i < forbiddenZones.length; i++) {
@@ -214,70 +214,120 @@ const Renderer = (() => {
                 // If zone is about to disappear soon, show a subtle indicator
                 if (age > baseDuration * 0.75) {
                     const safetyLevel = (age - baseDuration * 0.75) / (baseDuration * 0.25);
-                    offscreenCtx.fillStyle = `rgba(122, 255, 122, ${0.1 + safetyLevel * 0.1})`;
-                    offscreenCtx.beginPath();
-                    offscreenCtx.roundRect(
-                        zone.x * gridSize + gridSize * 0.25,
-                        zone.y * gridSize + gridSize * 0.25,
-                        gridSize * 0.5,
-                        gridSize * 0.5,
-                        3
-                    );
-                    offscreenCtx.fill();
+                    // Green moss/vegetation growing over the obstacle
+                    offscreenCtx.fillStyle = `rgba(92, 153, 95, ${0.2 + safetyLevel * 0.3})`;
+                    
+                    // Draw moss patches in different spots
+                    for (let p = 0; p < 4; p++) {
+                        const patchSize = gridSize * (0.15 + safetyLevel * 0.2);
+                        const patchX = zone.x * gridSize + (p % 2 === 0 ? patchSize : gridSize - patchSize * 2);
+                        const patchY = zone.y * gridSize + (p < 2 ? patchSize : gridSize - patchSize * 2);
+                        
+                        offscreenCtx.beginPath();
+                        offscreenCtx.arc(patchX, patchY, patchSize, 0, Math.PI * 2);
+                        offscreenCtx.fill();
+                    }
+                    
+                    // Add growing vines
+                    offscreenCtx.strokeStyle = `rgba(92, 153, 95, ${0.3 + safetyLevel * 0.3})`;
+                    offscreenCtx.lineWidth = 1.5;
+                    
+                    const vineLength = gridSize * 0.4 * safetyLevel;
+                    const centerX = zone.x * gridSize + gridSize / 2;
+                    const centerY = zone.y * gridSize + gridSize / 2;
+                    
+                    for (let v = 0; v < 3; v++) {
+                        const angle = (v / 3) * Math.PI * 2;
+                        offscreenCtx.beginPath();
+                        offscreenCtx.moveTo(centerX, centerY);
+                        offscreenCtx.bezierCurveTo(
+                            centerX, centerY - vineLength / 2,
+                            centerX + Math.cos(angle) * vineLength, centerY + Math.sin(angle) * vineLength / 2,
+                            centerX + Math.cos(angle) * vineLength, centerY + Math.sin(angle) * vineLength
+                        );
+                        offscreenCtx.stroke();
+                    }
                 }
             }
         }
     }
     
-    // Draw forbidden zones
+    // Draw forbidden zones as natural obstacles
     function drawForbiddenZones(forbiddenZones, gridSize) {
         offscreenCtx.save();
         for (let i = 0; i < forbiddenZones.length; i++) {
             const zone = forbiddenZones[i];
-            // Base color is red, but new zones "flash" briefly
+            // Base color is earthy brown/stone
             let zoneOpacity = zone.opacity;
             
             // Different visual appearance based on danger level
             let zoneColor;
             if (zone.dangerLevel === 'high') {
-                zoneColor = zone.isNew ? 'rgba(255, 50, 50, ' : 'rgba(239, 35, 35, ';
+                // Darker, more dangerous looking stone/thorns
+                zoneColor = zone.isNew ? 'rgba(61, 38, 30, ' : 'rgba(51, 31, 24, ';
             } else {
-                zoneColor = zone.isNew ? 'rgba(255, 100, 100, ' : 'rgba(239, 68, 68, ';
+                // Lighter stone/rocks
+                zoneColor = zone.isNew ? 'rgba(79, 57, 43, ' : 'rgba(69, 50, 38, ';
             }
             offscreenCtx.fillStyle = zoneColor + zoneOpacity + ")";
             
-            offscreenCtx.fillRect(
-                zone.x * gridSize,
-                zone.y * gridSize,
-                gridSize,
-                gridSize
-            );
-            
-            // Add X pattern with improved visual effect
-            offscreenCtx.strokeStyle = `rgba(255, 255, 255, ${zoneOpacity})`;
-            offscreenCtx.lineWidth = zone.dangerLevel === 'high' ? 3 : 2;
+            // Draw the base of the obstacle (stone/rock)
             offscreenCtx.beginPath();
-            offscreenCtx.moveTo(zone.x * gridSize + 4, zone.y * gridSize + 4);
-            offscreenCtx.lineTo((zone.x + 1) * gridSize - 4, (zone.y + 1) * gridSize - 4);
-            offscreenCtx.moveTo((zone.x + 1) * gridSize - 4, zone.y * gridSize + 4);
-            offscreenCtx.lineTo(zone.x * gridSize + 4, (zone.y + 1) * gridSize - 4);
-            offscreenCtx.stroke();
+            offscreenCtx.roundRect(
+                zone.x * gridSize + 1,
+                zone.y * gridSize + 1,
+                gridSize - 2,
+                gridSize - 2,
+                5
+            );
+            offscreenCtx.fill();
             
-            // Add extra warning pulse for high danger zones
-            if (zone.dangerLevel === 'high') {
-                const pulsePhase = (performance.now() % 1000) / 1000;
-                const pulseSize = Math.sin(pulsePhase * Math.PI * 2) * 3;
+            // Add rock texture with cracks
+            offscreenCtx.strokeStyle = `rgba(40, 30, 25, ${zoneOpacity * 0.7})`;
+            offscreenCtx.lineWidth = zone.dangerLevel === 'high' ? 2 : 1;
+            
+            // Create random "cracks" pattern based on tile position for consistency
+            const crackSeed = zone.x * 100 + zone.y;
+            const crackCount = zone.dangerLevel === 'high' ? 3 : 2;
+            
+            for (let c = 0; c < crackCount; c++) {
+                // Deterministic random based on position and crack number
+                const seed = (crackSeed + c * 57) % 100 / 100;
+                const startX = zone.x * gridSize + gridSize * (0.3 + seed * 0.4);
+                const startY = zone.y * gridSize + gridSize * (0.2 + (seed * 73 % 100) / 100 * 0.6);
+                const length = gridSize * (0.3 + seed * 0.3);
+                const angle = seed * Math.PI;
                 
-                offscreenCtx.strokeStyle = `rgba(255, 255, 255, ${zoneOpacity * 0.5})`;
                 offscreenCtx.beginPath();
-                offscreenCtx.roundRect(
-                    zone.x * gridSize - pulseSize,
-                    zone.y * gridSize - pulseSize,
-                    gridSize + pulseSize * 2,
-                    gridSize + pulseSize * 2,
-                    3 + pulseSize
+                offscreenCtx.moveTo(startX, startY);
+                offscreenCtx.lineTo(
+                    startX + Math.cos(angle) * length,
+                    startY + Math.sin(angle) * length
                 );
                 offscreenCtx.stroke();
+            }
+            
+            // Add danger indicator for high danger zones
+            if (zone.dangerLevel === 'high') {
+                const pulsePhase = (performance.now() % 1000) / 1000;
+                const pulseSize = Math.sin(pulsePhase * Math.PI * 2) * 2;
+                
+                // Add thorns or spikes for high danger
+                offscreenCtx.fillStyle = `rgba(101, 67, 33, ${zoneOpacity * 0.9})`;
+                
+                // Top spike
+                offscreenCtx.beginPath();
+                offscreenCtx.moveTo(zone.x * gridSize + gridSize/2, zone.y * gridSize + 2);
+                offscreenCtx.lineTo(zone.x * gridSize + gridSize/2 - 4, zone.y * gridSize + 8);
+                offscreenCtx.lineTo(zone.x * gridSize + gridSize/2 + 4, zone.y * gridSize + 8);
+                offscreenCtx.fill();
+                
+                // Bottom spike
+                offscreenCtx.beginPath();
+                offscreenCtx.moveTo(zone.x * gridSize + gridSize/2, zone.y * gridSize + gridSize - 2);
+                offscreenCtx.lineTo(zone.x * gridSize + gridSize/2 - 4, zone.y * gridSize + gridSize - 8);
+                offscreenCtx.lineTo(zone.x * gridSize + gridSize/2 + 4, zone.y * gridSize + gridSize - 8);
+                offscreenCtx.fill();
             }
         }
         offscreenCtx.restore();
@@ -336,28 +386,28 @@ const Renderer = (() => {
         }
     }
     
-    // Draw food with type variations
+    // Draw food with type variations to resemble natural food
     function drawFood(food, gridSize, halfGridSize) {
         if (!food) return;
         
-        // Get food color based on type
-        let foodColor = '#ef4444'; // Default red
+        // Get food properties based on type
+        let foodColor = '#c44536'; // Default red apple color
         let glowStrength = 10;
-        let size = halfGridSize - 1;
+        let size = halfGridSize - 2;
         
         if (food.type) {
             // Different appearances based on food type
             switch (food.type) {
                 case 'NORMAL':
-                    foodColor = '#ef4444';
+                    foodColor = '#c44536'; // Red apple color
                     break;
                 case 'BONUS':
-                    foodColor = '#ff9f1c';
+                    foodColor = '#e9c46a'; // Golden/yellow fruit color
                     glowStrength = 12;
                     size += 1;
                     break;
                 case 'SUPER':
-                    foodColor = '#f72585';
+                    foodColor = '#aa4465'; // Berry color
                     glowStrength = 15;
                     size += 2;
                     
@@ -367,7 +417,7 @@ const Renderer = (() => {
                     size *= pulseFactor;
                     break;
                 case 'EPIC':
-                    foodColor = '#7209b7';
+                    foodColor = '#6153cc'; // Purple exotic fruit
                     glowStrength = 18;
                     size += 3;
                     
@@ -381,21 +431,78 @@ const Renderer = (() => {
         // Draw glow
         offscreenCtx.shadowColor = foodColor;
         offscreenCtx.shadowBlur = glowStrength;
+        offscreenCtx.save();
         
-        // Draw food
+        // Draw food base shape
         offscreenCtx.fillStyle = foodColor;
-        offscreenCtx.beginPath();
-        offscreenCtx.arc(
-            food.x * gridSize + halfGridSize,
-            food.y * gridSize + halfGridSize,
-            size,
-            0,
-            Math.PI * 2
-        );
-        offscreenCtx.fill();
         
-        // Reset shadow
+        // Draw food in apple/fruit shape rather than simple circle
+        const centerX = food.x * gridSize + halfGridSize;
+        const centerY = food.y * gridSize + halfGridSize;
+        
+        // Use different shapes based on food type
+        if (food.type === 'NORMAL') {
+            // Apple shape (circle with stem)
+            offscreenCtx.beginPath();
+            offscreenCtx.arc(centerX, centerY, size, 0, Math.PI * 2);
+            offscreenCtx.fill();
+            
+            // Add stem
+            offscreenCtx.fillStyle = '#5a3921'; // Brown stem
+            offscreenCtx.beginPath();
+            offscreenCtx.fillRect(centerX - 1, centerY - size - 3, 2, 4);
+            
+            // Add leaf
+            offscreenCtx.fillStyle = '#5ba45f'; // Green leaf
+            offscreenCtx.beginPath();
+            offscreenCtx.ellipse(centerX + 3, centerY - size - 2, 3, 2, Math.PI / 4, 0, Math.PI * 2);
+            offscreenCtx.fill();
+            
+        } else if (food.type === 'BONUS') {
+            // Banana shape (curved ellipse)
+            offscreenCtx.beginPath();
+            offscreenCtx.ellipse(centerX, centerY, size * 1.2, size * 0.8, Math.PI / 4, 0, Math.PI * 2);
+            offscreenCtx.fill();
+            
+        } else if (food.type === 'SUPER') {
+            // Berry cluster
+            for (let i = 0; i < 3; i++) {
+                const offsetX = (i - 1) * 3;
+                const offsetY = i === 1 ? -3 : 0;
+                offscreenCtx.beginPath();
+                offscreenCtx.arc(centerX + offsetX, centerY + offsetY, size * 0.6, 0, Math.PI * 2);
+                offscreenCtx.fill();
+            }
+            
+            // Add stem
+            offscreenCtx.fillStyle = '#5a3921';
+            offscreenCtx.beginPath();
+            offscreenCtx.fillRect(centerX - 1, centerY - size - 1, 2, 3);
+            
+        } else { // Epic
+            // Exotic star fruit shape
+            offscreenCtx.beginPath();
+            const spikes = 5;
+            const outerRadius = size * 1.2;
+            const innerRadius = size * 0.6;
+            
+            offscreenCtx.moveTo(centerX + outerRadius, centerY);
+            
+            for (let i = 0; i < spikes * 2; i++) {
+                const radius = i % 2 === 0 ? innerRadius : outerRadius;
+                const angle = (Math.PI / spikes) * i;
+                const x = centerX + Math.cos(angle) * radius;
+                const y = centerY + Math.sin(angle) * radius;
+                offscreenCtx.lineTo(x, y);
+            }
+            
+            offscreenCtx.closePath();
+            offscreenCtx.fill();
+        }
+        
+        // Reset shadow and restore context
         offscreenCtx.shadowBlur = 0;
+        offscreenCtx.restore();
     }
     
     // Draw snake with active effects
@@ -592,16 +699,30 @@ const Renderer = (() => {
             
             offscreenCtx.save();
             
-            // Draw background
-            offscreenCtx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            // Draw background with natural wood/bark texture
+            offscreenCtx.fillStyle = 'rgba(69, 50, 38, 0.8)';
             offscreenCtx.beginPath();
             offscreenCtx.roundRect(10, y, 120, height, 5);
             offscreenCtx.fill();
             
-            // Draw progress bar
+            // Add subtle wood grain texture
+            offscreenCtx.strokeStyle = 'rgba(90, 65, 50, 0.5)';
+            offscreenCtx.lineWidth = 0.5;
+            for (let i = 0; i < 3; i++) {
+                offscreenCtx.beginPath();
+                offscreenCtx.moveTo(15, y + 5 + i * 8);
+                offscreenCtx.bezierCurveTo(
+                    40, y + 7 + i * 8 + Math.sin(i) * 3,
+                    80, y + 3 + i * 8 - Math.sin(i + 1) * 3,
+                    125, y + 5 + i * 8
+                );
+                offscreenCtx.stroke();
+            }
+            
+            // Draw progress bar with leaf gradient
             const barWidth = 110 * progress;
-            const hue = 120 * progress; // Green to red gradient
-            offscreenCtx.fillStyle = `hsl(${hue}, 80%, 60%)`;
+            const greenHue = 100 + 40 * (1 - progress); // Greener to yellower as time runs out
+            offscreenCtx.fillStyle = `hsl(${greenHue}, 70%, 45%)`;
             offscreenCtx.beginPath();
             offscreenCtx.roundRect(15, y + 5, barWidth, height - 10, 3);
             offscreenCtx.fill();
@@ -632,25 +753,54 @@ const Renderer = (() => {
         });
     }
     
-    // Draw game over screen with enhanced stats
+    // Draw game over screen with enhanced stats and natural theme
     function drawGameOver(score) {
-        // Draw background overlay
-        offscreenCtx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        // Draw background overlay with earthy transparent background
+        offscreenCtx.fillStyle = 'rgba(26, 47, 35, 0.85)';
         offscreenCtx.fillRect(0, 0, canvas.width, canvas.height);
         
+        // Add natural border with vine-like decoration
+        offscreenCtx.strokeStyle = '#5ba45f';
+        offscreenCtx.lineWidth = 4;
+        offscreenCtx.beginPath();
+        offscreenCtx.roundRect(20, 20, canvas.width - 40, canvas.height - 40, 10);
+        offscreenCtx.stroke();
+        
+        // Add decorative leaf patterns in corners
+        const drawLeaf = (x, y, size, rotation) => {
+            offscreenCtx.save();
+            offscreenCtx.translate(x, y);
+            offscreenCtx.rotate(rotation);
+            offscreenCtx.fillStyle = 'rgba(91, 164, 95, 0.5)';
+            offscreenCtx.beginPath();
+            // Leaf shape
+            offscreenCtx.moveTo(0, 0);
+            offscreenCtx.bezierCurveTo(size/3, size/3, size/2, 0, size, 0);
+            offscreenCtx.bezierCurveTo(size/2, size/3, size/3, size/2, 0, size);
+            offscreenCtx.bezierCurveTo(size/4, size/2, size/4, size/4, 0, 0);
+            offscreenCtx.fill();
+            offscreenCtx.restore();
+        };
+        
+        // Draw leaves in corners
+        drawLeaf(30, 30, 25, Math.PI * 0.25);
+        drawLeaf(canvas.width - 30, 30, 25, Math.PI * -0.25);
+        drawLeaf(30, canvas.height - 30, 25, Math.PI * 0.75);
+        drawLeaf(canvas.width - 30, canvas.height - 30, 25, Math.PI * -0.75);
+        
         // Draw game over title
-        offscreenCtx.fillStyle = '#f5f5f5';
+        offscreenCtx.fillStyle = '#f5f8f2';
         offscreenCtx.font = 'bold 36px "Segoe UI", sans-serif';
         offscreenCtx.textAlign = 'center';
         offscreenCtx.fillText('Game Over!', canvas.width / 2, canvas.height / 2 - 60);
         
-        // Draw score
+        // Draw score with natural theme
         offscreenCtx.font = '24px "Segoe UI", sans-serif';
         offscreenCtx.fillText(`Score: ${score}`, canvas.width / 2, canvas.height / 2 - 20);
         
         // Draw restart instructions
         offscreenCtx.font = '20px "Segoe UI", sans-serif';
-        offscreenCtx.fillStyle = '#4ade80';
+        offscreenCtx.fillStyle = '#6dbc78';
         offscreenCtx.fillText('Press R or Tap Restart', canvas.width / 2, canvas.height / 2 + 40);
     }
     
