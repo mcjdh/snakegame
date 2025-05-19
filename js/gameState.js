@@ -710,6 +710,17 @@ const GameState = (() => {
         
         state.activePowerUps.push(activePU);
         state.powerUpsCollected++;
+
+        // By default, grow the snake by 1 segment when collecting a power-up (except SHRINK)
+        if (powerUp.type !== 'SHRINK') {
+            // Add a new segment at the tail's position
+            if (state.snake.length > 0) {
+                const tail = state.snake[state.snake.length - 1];
+                // Clone the tail segment
+                state.snake.push({ x: tail.x, y: tail.y });
+            }
+            showPowerUpNotification('Snake Grew!');
+        }
         
         // Handle immediate effects
         if (powerUp.type === 'CLEAR_PATH') {
@@ -851,125 +862,134 @@ const GameState = (() => {
     // Update game state for a frame
     function update(currentTime, deltaTime) {
         if (state.gameOver) return;
-        
+
         // Update forbidden zones
         ZoneManager.updateZones(state.forbiddenZones, currentTime);
-        
+
         // Update power-ups
         updatePowerUps(currentTime);
-        
+
         // Update particles
         updateParticles();
-        
+
         // Update combo system
         updateComboSystem(currentTime);
-        
-        // Move the snake
-        moveSnake();
-        
-        // Check for collision
-        if (checkCollision()) {
-            state.gameOver = true;
-            
-            // Add death particles
-            createDeathParticles();
-            
-            // Trigger screen shake
-            triggerScreenShake(10, 800);
-            
-            // Play death sound if implemented
-            if (typeof SoundManager !== 'undefined') {
-                SoundManager.play('death');
+
+        // Only move the snake if enough time has passed
+        if (!state.lastMoveTime) state.lastMoveTime = currentTime;
+        if (currentTime - state.lastMoveTime >= state.gameSpeed) {
+            state.lastMoveTime = currentTime;
+
+            // Move the snake
+            moveSnake();
+
+            // Check for collision
+            if (checkCollision()) {
+                state.gameOver = true;
+
+                // Add death particles
+                createDeathParticles();
+
+                // Trigger screen shake
+                triggerScreenShake(10, 800);
+
+                // Play death sound if implemented
+                if (typeof SoundManager !== 'undefined') {
+                    SoundManager.play('death');
+                }
+
+                return;
             }
-            
-            return;
-        }
-        
-        // Track snake movement for trail
-        trackSnakePosition(currentTime);
-        
-        // Check if snake eats food
-        if (state.snake[0].x === state.food.x && state.snake[0].y === state.food.y) {
-            // Get food data
-            const foodType = state.food.type;
-            const foodData = FOOD_TYPES[foodType];
-            
-            // Update combo system
-            state.comboCount++;
-            state.comboTimer = currentTime;
-            state.multiplier = 1 + Math.min(1, state.comboCount * 0.1); // Cap at 2x
-            state.highestCombo = Math.max(state.highestCombo, state.comboCount);
-            
-            // Calculate score with multipliers
-            let points = foodData.points;
-            if (isPowerUpActive('SCORE_BOOST')) {
-                points *= 2;
-            }
-            // Apply combo multiplier
-            points = Math.floor(points * state.multiplier);
-            
-            // Add points
-            state.score += points;
-            scoreElement.textContent = state.score;
-            
-            // Create score popup with combo information
-            let comboText = '';
-            if (state.comboCount > 1) {
-                comboText = ` x${state.comboCount}`;
-            }
-            showScorePopup(`+${points}${comboText}`, state.food.x * gridSize + halfGridSize, state.food.y * gridSize);
-            
-            // Create food collection particles
-            createFoodCollectionParticles(state.food.x, state.food.y, foodData.color);
-            
-            // Generate new food
-            generateFood();
-            
-            // Check for level progression
-            const leveledUp = checkLevelProgression();
-            
-            // If we didn't just level up, adjust game speed
-            if (!leveledUp && state.score % 60 === 0 && state.gameSpeed > 70) {
-                state.gameSpeed -= 4;
-                
-                // Adjust difficulty and pattern as score increases
-                if (state.difficultyLevel < 2.5) {
-                    state.difficultyLevel += 0.15;
+
+            // Track snake movement for trail
+            trackSnakePosition(currentTime);
+
+            // Check if snake eats food
+            if (state.snake[0].x === state.food.x && state.snake[0].y === state.food.y) {
+                // Get food data
+                const foodType = state.food.type;
+                const foodData = FOOD_TYPES[foodType];
+
+                // Update combo system
+                state.comboCount++;
+                state.comboTimer = currentTime;
+                state.multiplier = 1 + Math.min(1, state.comboCount * 0.1); // Cap at 2x
+                state.highestCombo = Math.max(state.highestCombo, state.comboCount);
+
+                // Calculate score with multipliers
+                let points = foodData.points;
+                if (isPowerUpActive('SCORE_BOOST')) {
+                    points *= 2;
+                }
+                // Apply combo multiplier
+                points = Math.floor(points * state.multiplier);
+
+                // Add points
+                state.score += points;
+                scoreElement.textContent = state.score;
+
+                // Create score popup with combo information
+                let comboText = '';
+                if (state.comboCount > 1) {
+                    comboText = ` x${state.comboCount}`;
+                }
+                showScorePopup(`+${points}${comboText}`, state.food.x * gridSize + halfGridSize, state.food.y * gridSize);
+
+                // Create food collection particles
+                createFoodCollectionParticles(state.food.x, state.food.y, foodData.color);
+
+                // Generate new food
+                generateFood();
+
+                // Check for level progression
+                const leveledUp = checkLevelProgression();
+
+                // If we didn't just level up, adjust game speed
+                if (!leveledUp && state.score % 60 === 0 && state.gameSpeed > 70) {
+                    state.gameSpeed -= 4;
+
+                    // Adjust difficulty and pattern as score increases
+                    if (state.difficultyLevel < 2.5) {
+                        state.difficultyLevel += 0.15;
+                    }
+                }
+
+                // Add small screen shake for food collection
+                if (foodType !== 'NORMAL') {
+                    const intensity = foodType === 'EPIC' ? 8 : (foodType === 'SUPER' ? 5 : 3);
+                    triggerScreenShake(intensity, 250);
+                }
+
+                // Play appropriate sound effect if implemented
+                if (typeof SoundManager !== 'undefined') {
+                    const soundType = foodType === 'NORMAL' ? 'eat' : 'eatSpecial';
+                    SoundManager.play(soundType);
+                }
+            } else {
+                // Remove tail segment
+                const tail = state.snake.pop();
+
+                // Create forbidden zone where the tail was
+                if (state.snake.length > 3) {
+                    ZoneManager.createZone(
+                        tail.x, 
+                        tail.y, 
+                        currentTime, 
+                        state.moveCount, 
+                        state.zonePattern, 
+                        state.difficultyLevel,
+                        state.forbiddenZones,
+                        state.forbiddenDuration,
+                        state.snake // Pass snake to prevent zones from spawning on snake
+                    );
                 }
             }
-            
-            // Add small screen shake for food collection
-            if (foodType !== 'NORMAL') {
-                const intensity = foodType === 'EPIC' ? 8 : (foodType === 'SUPER' ? 5 : 3);
-                triggerScreenShake(intensity, 250);
-            }
-            
-            // Play appropriate sound effect if implemented
-            if (typeof SoundManager !== 'undefined') {
-                const soundType = foodType === 'NORMAL' ? 'eat' : 'eatSpecial';
-                SoundManager.play(soundType);
-            }
-        } else {
-            // Remove tail segment
-            const tail = state.snake.pop();
-            
-            // Create forbidden zone where the tail was
-            if (state.snake.length > 3) {
-                ZoneManager.createZone(
-                    tail.x, 
-                    tail.y, 
-                    currentTime, 
-                    state.moveCount, 
-                    state.zonePattern, 
-                    state.difficultyLevel,
-                    state.forbiddenZones,
-                    state.forbiddenDuration,
-                    state.snake // Pass snake to prevent zones from spawning on snake
-                );
-            }
+
+            state.moveCount++;
+
+            // Level progression
+            checkLevelProgression();
         }
-        
-        state.moveCount++;
     }
     
     // Create food collection particles (new)

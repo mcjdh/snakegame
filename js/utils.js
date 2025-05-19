@@ -44,15 +44,19 @@ function showScorePopup(points, x, y) {
     const popup = document.createElement('div');
     popup.className = 'score-popup';
     popup.textContent = `+${points}`;
-    
-    // Position popup at the food's position
-    const canvasRect = document.getElementById('gameCanvas').getBoundingClientRect();
-    popup.style.left = `${canvasRect.left + x}px`;
-    popup.style.top = `${canvasRect.top + y - 20}px`;
-    
+
+    // Position popup below the canvas, centered horizontally
+    const canvas = document.getElementById('gameCanvas');
+    const canvasRect = canvas.getBoundingClientRect();
+    // Center horizontally, float below the canvas (never over the grid)
+    popup.style.left = `${canvasRect.left + canvasRect.width / 2}px`;
+    popup.style.top = `${canvasRect.bottom + 16}px`;
+    popup.style.transform = 'translateX(-50%)';
+    popup.style.pointerEvents = 'none';
+
     // Add to DOM and animate
     document.body.appendChild(popup);
-    
+
     // Remove after animation completes
     setTimeout(() => {
         popup.remove();
@@ -64,8 +68,18 @@ function showPowerUpNotification(message) {
     const notification = document.createElement('div');
     notification.className = 'power-up-notification';
     notification.textContent = message;
+
+    // Position notification below the canvas, centered
+    const canvas = document.getElementById('gameCanvas');
+    const canvasRect = canvas.getBoundingClientRect();
+    notification.style.position = 'absolute';
+    notification.style.left = `${canvasRect.left + canvasRect.width / 2}px`;
+    notification.style.top = `${canvasRect.bottom + 48}px`;
+    notification.style.transform = 'translateX(-50%)';
+    notification.style.pointerEvents = 'none';
+
     document.body.appendChild(notification);
-    
+
     // Animate and remove
     setTimeout(() => {
         notification.classList.add('fade-out');

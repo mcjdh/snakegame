@@ -68,8 +68,7 @@ const Renderer = (() => {
     
     // Cache for power-up types info
     let powerUpTypes = null;
-    
-    // Initialize renderer
+      // Initialize renderer
     function init(gridSize, tileCount, powerUpTypesData) {
         createGridCanvas(gridSize, tileCount);
         resizeCanvas();
@@ -79,10 +78,74 @@ const Renderer = (() => {
             powerUpTypes = powerUpTypesData;
         }
         
+        // Create styles for power-up indicators if not already present
+        createPowerUpStyles();
+        
         return {
             canvas: canvas,
             canvasRect: canvasRect
         };
+    }
+    
+    // Create CSS for power-up indicators
+    function createPowerUpStyles() {
+        if (!document.getElementById('powerup-indicator-styles')) {
+            const style = document.createElement('style');
+            style.id = 'powerup-indicator-styles';
+            style.textContent = `
+                .active-powerups-container {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 8px;
+                    position: absolute;
+                    top: 10px;
+                    right: 10px;
+                    max-width: 180px;
+                    z-index: 100;
+                }
+                
+                .powerup-indicator {
+                    display: flex;
+                    align-items: center;
+                    background-color: rgba(0, 0, 0, 0.7);
+                    border-radius: 6px;
+                    padding: 6px;
+                    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+                    border-left: 4px solid var(--accent-color);
+                }
+                
+                .powerup-symbol {
+                    font-size: 18px;
+                    margin-right: 8px;
+                    width: 24px;
+                    text-align: center;
+                }
+                
+                .powerup-details {
+                    flex: 1;
+                }
+                
+                .powerup-name {
+                    font-size: 12px;
+                    font-weight: bold;
+                    margin-bottom: 3px;
+                    color: white;
+                }
+                
+                .powerup-progress-bg {
+                    height: 6px;
+                    background-color: rgba(255, 255, 255, 0.2);
+                    border-radius: 3px;
+                    overflow: hidden;
+                }
+                
+                .powerup-progress {
+                    height: 100%;
+                    border-radius: 3px;
+                }
+            `;
+            document.head.appendChild(style);
+        }
     }
     
     // Draw the entire game with optimized performance
@@ -145,9 +208,10 @@ const Renderer = (() => {
         // Draw game mode info and current level
         drawGameInfo(zonePattern, level, levelName, gameState.isPowerUpActive ? gameState.isPowerUpActive : () => false);
         
-        // Draw active power-up indicators - only if there are any active
+    // Draw active power-up indicators - only if there are any active
         if (activePowerUps && activePowerUps.length > 0) {
-            drawPowerUpIndicators(activePowerUps, currentTime);
+            // Update external power-up UI instead of drawing on canvas
+            updateExternalPowerUpIndicators(activePowerUps, currentTime);
         }
         
         // Draw combo indicator if combo is active
@@ -723,40 +787,49 @@ const Renderer = (() => {
         
         offscreenCtx.restore();
     }
-    
-    // Draw power-up indicators
-    function drawPowerUpIndicators(activePowerUps, currentTime) {
-        if (!activePowerUps || activePowerUps.length === 0) return;
+      // Create or update external power-up indicators outside the canvas
+    function updateExternalPowerUpIndicators(activePowerUps, currentTime) {
+        if (!activePowerUps || activePowerUps.length === 0) {
+            // Clear existing indicators if no active power-ups
+            const container = document.getElementById('active-powerups-container');
+            if (container) {
+                container.innerHTML = '';
+            }
+            return;
+        }
         
-        const startY = 60;
-        const height = 30;
-        const spacing = 35;
+        // Get or create container for power-up indicators
+        let container = document.getElementById('active-powerups-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'active-powerups-container';
+            container.className = 'active-powerups-container';
+            
+            // Insert after canvas container
+            const canvasContainer = document.querySelector('.canvas-container');
+            if (canvasContainer && canvasContainer.parentNode) {
+                canvasContainer.parentNode.insertBefore(container, canvasContainer.nextSibling);
+            } else {
+                document.body.appendChild(container);
+            }
+        }
         
+        // Clear existing indicators
+        container.innerHTML = '';
+        
+        // Create indicators for each active power-up
         activePowerUps.forEach((pu, index) => {
             // Skip if no duration (like instant power-ups)
             if (!pu.duration) return;
             
-            const y = startY + index * spacing;
             const progress = 1 - ((currentTime - pu.startTime) / pu.duration);
             
             // Only show if there's time remaining
             if (progress <= 0) return;
             
-            offscreenCtx.save();
-            
-            // Draw background
-            offscreenCtx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-            offscreenCtx.beginPath();
-            offscreenCtx.roundRect(10, y, 120, height, 5);
-            offscreenCtx.fill();
-            
-            // Draw progress bar
-            const barWidth = 110 * progress;
-            const hue = 120 * progress; // Green to red gradient
-            offscreenCtx.fillStyle = `hsl(${hue}, 80%, 60%)`;
-            offscreenCtx.beginPath();
-            offscreenCtx.roundRect(15, y + 5, barWidth, height - 10, 3);
-            offscreenCtx.fill();
+            // Create indicator element
+            const indicator = document.createElement('div');
+            indicator.className = 'powerup-indicator';
             
             // Default values if no symbol info
             let symbol = '✨';
@@ -765,23 +838,35 @@ const Renderer = (() => {
             // Use cached power-up types if available
             if (powerUpTypes && powerUpTypes[pu.type]) {
                 symbol = powerUpTypes[pu.type].symbol || '✨';
+                // Get color from power-up type
+                if (powerUpTypes[pu.type].color) {
+                    indicator.style.borderColor = powerUpTypes[pu.type].color;
+                }
             }
             
-            // Draw icon
-            offscreenCtx.fillStyle = '#ffffff';
-            offscreenCtx.font = '14px Arial';
-            offscreenCtx.textAlign = 'left';
-            offscreenCtx.textBaseline = 'middle';
-            offscreenCtx.fillText(symbol, 20, y + height/2);
+            // Create progress bar
+            const hue = 120 * progress; // Green to red gradient
             
-            // Draw name
-            offscreenCtx.fillStyle = '#ffffff';
-            offscreenCtx.font = 'bold 12px "Segoe UI", sans-serif';
-            offscreenCtx.textAlign = 'left';
-            offscreenCtx.fillText(typeName, 40, y + height/2);
+            // Populate the indicator
+            indicator.innerHTML = `
+                <div class="powerup-symbol">${symbol}</div>
+                <div class="powerup-details">
+                    <div class="powerup-name">${typeName}</div>
+                    <div class="powerup-progress-bg">
+                        <div class="powerup-progress" style="width: ${progress * 100}%; background-color: hsl(${hue}, 80%, 60%)"></div>
+                    </div>
+                </div>
+            `;
             
-            offscreenCtx.restore();
+            // Add to container
+            container.appendChild(indicator);
         });
+    }
+
+    // Legacy draw power-up indicators on canvas (no longer used)
+    function drawPowerUpIndicators(activePowerUps, currentTime) {
+        // This function is kept for reference but no longer used
+        // We now use external HTML elements for power-up indicators
     }
     
     // Draw game over screen with enhanced stats
@@ -826,12 +911,18 @@ const Renderer = (() => {
         offscreenCtx.fillStyle = '#4ade80';
         offscreenCtx.fillText('Press R or Tap Restart', canvas.width / 2, canvas.height / 2 + 80);
     }
-    
-    // API exposed to other modules
+      // API exposed to other modules
     return {
         init,
         drawGame,
         getCanvasRect: () => canvasRect,
-        cleanup: () => window.removeEventListener('resize', debouncedResize)
+        cleanup: () => {
+            window.removeEventListener('resize', debouncedResize);
+            // Remove power-up indicator container if it exists
+            const container = document.getElementById('active-powerups-container');
+            if (container && container.parentNode) {
+                container.parentNode.removeChild(container);
+            }
+        }
     };
 })();
