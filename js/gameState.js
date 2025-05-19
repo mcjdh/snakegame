@@ -257,9 +257,28 @@ const GameState = (() => {
             }
         } else {
             // Fallback if no positions are available (rare edge case)
+            // Find a position that avoids at least the snake
+            let fallbackX, fallbackY;
+            let attempts = 0;
+            const maxAttempts = 50; // Limit attempts to avoid infinite loop
+            
+            do {
+                fallbackX = Math.floor(Math.random() * tileCount);
+                fallbackY = Math.floor(Math.random() * tileCount);
+                attempts++;
+                
+                // Check if this position would overlap with the snake
+                const wouldOverlapSnake = state.snake.some(segment => 
+                    segment.x === fallbackX && segment.y === fallbackY);
+                
+                if (!wouldOverlapSnake) {
+                    break; // Found a valid position
+                }
+            } while (attempts < maxAttempts);
+            
             state.food = {
-                x: Math.floor(Math.random() * tileCount),
-                y: Math.floor(Math.random() * tileCount),
+                x: fallbackX,
+                y: fallbackY,
                 type: 'NORMAL',
                 pulsePhase: 0
             };
@@ -668,7 +687,10 @@ const GameState = (() => {
         }
         
         // Occasionally spawn power-ups (1% chance per update, limited to 3 at a time)
-        if (state.powerUps.length < 3 && Math.random() < 0.01) {
+        // Ensure there's enough space for power-ups
+        if (state.powerUps.length < 3 && 
+            Math.random() < 0.01 && 
+            tileCount * tileCount - state.snake.length - state.forbiddenZones.length > 10) {
             spawnPowerUp();
         }
     }
@@ -838,7 +860,8 @@ const GameState = (() => {
                     state.zonePattern, 
                     state.difficultyLevel,
                     state.forbiddenZones,
-                    state.forbiddenDuration
+                    state.forbiddenDuration,
+                    state.snake // Pass snake to prevent zones from spawning on snake
                 );
             }
         }

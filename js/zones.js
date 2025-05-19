@@ -2,7 +2,7 @@
 
 const ZoneManager = (() => {
     // Create a forbidden zone at the specified coordinates with pattern logic
-    function createZone(x, y, currentTime, moveCount, pattern, difficultyLevel, forbiddenZones, duration) {
+    function createZone(x, y, currentTime, moveCount, pattern, difficultyLevel, forbiddenZones, duration, snake) {
         // Different zone generation patterns
         let shouldCreateZone = false;
         let dangerLevel = 'normal';
@@ -31,7 +31,11 @@ const ZoneManager = (() => {
         if (shouldCreateZone) {
             // Check if we already have a zone at this position
             const existingZone = forbiddenZones.find(zone => zone.x === x && zone.y === y);
-            if (!existingZone) {
+            
+            // Check if zone would spawn on snake (if snake array is provided)
+            const wouldOverlapSnake = snake && snake.some(segment => segment.x === x && segment.y === y);
+            
+            if (!existingZone && !wouldOverlapSnake) {
                 forbiddenZones.push({
                     x: x,
                     y: y,
