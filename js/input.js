@@ -125,25 +125,30 @@ const InputHandler = (() => {
         const dy = touchEndY - touchStartY;
         const touchDuration = Date.now() - touchTimeStart;
         
-        // Only handle quick swipes (less than 500ms)
-        if (touchDuration > 500) return;
+        // More responsive swipe - allow slightly longer duration for slower swipes
+        if (touchDuration > 600) return;
         
-        // Minimum swipe distance threshold
-        const minSwipeDistance = 30;
+        // Adjusted minimum swipe distance - more responsive on smaller screens
+        const minSwipeDistance = 20;
+        // Determine a minimum swipe velocity threshold - faster swipes should be detected even at shorter distances
+        const swipeVelocity = Math.sqrt(dx * dx + dy * dy) / touchDuration;
         
-        // Check horizontal vs vertical
-        if (Math.abs(dx) > Math.abs(dy)) {
+        // If the swipe is fast enough, reduce the minimum distance requirement
+        const effectiveMinDistance = swipeVelocity > 0.3 ? minSwipeDistance * 0.7 : minSwipeDistance;
+        
+        // Check horizontal vs vertical - favoriting the direction with greater movement
+        if (Math.abs(dx) > Math.abs(dy) * 1.1) { // Slightly favor horizontal
             // Horizontal swipe
-            if (Math.abs(dx) > minSwipeDistance) {
+            if (Math.abs(dx) > effectiveMinDistance) {
                 if (dx > 0 && state.snakeSpeed.x !== -1) {
                     gameState.setDirection({ x: 1, y: 0 }); // right
                 } else if (dx < 0 && state.snakeSpeed.x !== 1) {
                     gameState.setDirection({ x: -1, y: 0 }); // left
                 }
             }
-        } else {
+        } else if (Math.abs(dy) > Math.abs(dx) * 0.9) { // Slightly favor vertical
             // Vertical swipe
-            if (Math.abs(dy) > minSwipeDistance) {
+            if (Math.abs(dy) > effectiveMinDistance) {
                 if (dy > 0 && state.snakeSpeed.y !== -1) {
                     gameState.setDirection({ x: 0, y: 1 }); // down
                 } else if (dy < 0 && state.snakeSpeed.y !== 1) {
