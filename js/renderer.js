@@ -86,7 +86,7 @@ const Renderer = (() => {
     }
     
     // Draw the entire game
-    function drawGame(gameState, gridSize, halfGridSize) {
+    function drawGame(gameState, gridSize, halfGridSize, interpolation = null) {
         const { snake, food, forbiddenZones, lastPositions, powerUps, activePowerUps, 
                 zonePattern, score, gameOver, gameSpeed, snakeSpeed, particles, 
                 shake, level, levelName, comboCount, multiplier } = gameState;
@@ -123,8 +123,8 @@ const Renderer = (() => {
         // Draw food with type variation
         drawFood(food, gridSize, halfGridSize);
         
-        // Draw snake with active effects
-        drawSnake(snake, snakeSpeed, gridSize, halfGridSize, activePowerUps);
+        // Draw snake with active effects and interpolation if available
+        drawSnake(snake, snakeSpeed, gridSize, halfGridSize, activePowerUps, interpolation);
         
         // Draw game mode info and current level
         drawGameInfo(zonePattern, gameState.level, gameState.levelName, gameState.isPowerUpActive ? gameState.isPowerUpActive : () => false);
@@ -368,8 +368,8 @@ const Renderer = (() => {
         offscreenCtx.shadowBlur = 0;
     }
     
-    // Draw snake with active effects
-    function drawSnake(snake, snakeSpeed, gridSize, halfGridSize, activePowerUps) {
+    // Draw snake with active effects and interpolation for smoother movement
+    function drawSnake(snake, snakeSpeed, gridSize, halfGridSize, activePowerUps, interpolation = null) {
         if (!snake || snake.length === 0) return;
         
         // Check for special effects
@@ -379,7 +379,25 @@ const Renderer = (() => {
         
         // Draw snake body segments with special effects
         for (let i = 0; i < snake.length; i++) {
-            const segment = snake[i];
+            let segment = snake[i];
+            
+            // Apply interpolation for smoother movement if available
+            if (interpolation && interpolation.previousState && 
+                interpolation.previousState.snake && 
+                interpolation.previousState.snake[i] && 
+                i < Math.min(snake.length, interpolation.previousState.snake.length)) {
+                
+                const prevSegment = interpolation.previousState.snake[i];
+                const alpha = interpolation.alpha || 0;
+                
+                // Interpolate between previous and current position for smoother animation
+                if (i === 0) { // Only interpolate the head for visual smoothness
+                    segment = {
+                        x: prevSegment.x + (segment.x - prevSegment.x) * alpha,
+                        y: prevSegment.y + (segment.y - prevSegment.y) * alpha
+                    };
+                }
+            }
             
             // Apply special effects
             if (isInvulnerable) {

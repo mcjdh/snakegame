@@ -68,6 +68,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Use fixed time step for smoother movement
     const FIXED_TIME_STEP = 1000 / 60; // 60 updates per second
     let accumulator = 0;
+    let previousState = null;
+    let currentState = null;
 
     function gameLoop(currentTime) {
         if (gameOver) {
@@ -88,23 +90,36 @@ document.addEventListener('DOMContentLoaded', () => {
         // Update UI stats periodically
         updateStats();
 
+        // Store previous state for interpolation
+        previousState = currentState ? JSON.parse(JSON.stringify(currentState)) : GameState.getState();
+        
         // Fixed time step update
+        let updated = false;
         while (accumulator >= FIXED_TIME_STEP) {
             GameState.update(currentTime, FIXED_TIME_STEP);
             accumulator -= FIXED_TIME_STEP;
+            updated = true;
         }
-
-        // Get updated state and check for game over
-        const updatedState = GameState.getState();
-        if (updatedState.gameOver) {
+        
+        // Get updated state
+        currentState = GameState.getState();
+        
+        // Check for game over
+        if (currentState.gameOver) {
             gameOver = true;
             if (typeof SoundManager !== 'undefined') {
                 SoundManager.play('death');
             }
         }
 
-        // Draw everything (no interpolation for now, but could be added)
-        Renderer.drawGame(updatedState, gridSize, halfGridSize);
+        // Calculate interpolation factor for smooth rendering between states
+        const alpha = updated ? accumulator / FIXED_TIME_STEP : 0;
+        
+        // Draw everything with interpolation for smoother movement
+        Renderer.drawGame(currentState, gridSize, halfGridSize, {
+            previousState: previousState,
+            alpha: alpha
+        });
     }
     
     // Reset game state and start new game
