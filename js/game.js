@@ -87,6 +87,11 @@ document.addEventListener('DOMContentLoaded', () => {
         let deltaTime = currentTime - lastRenderTime;
         deltaTime = Math.min(deltaTime, MAX_DELTA_TIME);
         
+        // Record frame for performance monitoring
+        if (typeof PerformanceMonitor !== 'undefined') {
+            PerformanceMonitor.recordFrame(deltaTime);
+        }
+        
         accumulator += deltaTime;
         lastRenderTime = currentTime;
 
@@ -98,10 +103,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Fixed time step update with maximum updates per frame to prevent spiral of death
         let updatesThisFrame = 0;
+        const updateStartTime = performance.now();
+        
         while (accumulator >= FIXED_TIME_STEP && updatesThisFrame < MAX_UPDATES_PER_FRAME) {
             GameState.update(currentTime, FIXED_TIME_STEP);
             accumulator -= FIXED_TIME_STEP;
             updatesThisFrame++;
+        }
+        
+        // Record update time for performance monitoring
+        if (typeof PerformanceMonitor !== 'undefined') {
+            const updateTime = performance.now() - updateStartTime;
+            PerformanceMonitor.recordUpdate(updateTime);
         }
         
         // If we hit the update cap, drain any excess accumulator time

@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snake Game Test</title>
+    <style>
+        body {
+            background-color: #121212;
+            color: #f5f5f5;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        .game-container {
+            max-width: 800px;
+            width: 100%;
+            padding: 20px;
+        }
+        .game-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .score-display {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4ade80;
+        }
+        .canvas-container {
+            width: 100%;
+            max-width: 400px;
+            margin: 0 auto;
+            position: relative;
+            border: 2px solid #333;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: auto;
+            background-color: #1e1e1e;
+        }
+        .game-info {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 15px;
+        }
+        .info-box {
+            background-color: rgba(30, 30, 30, 0.7);
+            padding: 8px 16px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .food-normal { color: #ef4444; }
+        .food-bonus { color: #ff9f1c; }
+        .food-super { color: #f72585; }
+        .food-epic { color: #7209b7; }
+        .restart-button {
+            background-color: #4ade80;
+            color: #121212;
+            border: none;
+            border-radius: 4px;
+            padding: 10px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            margin-top: 20px;
+        }
+        .restart-button:hover {
+            background-color: #22c55e;
+        }
+        .controls {
+            margin-top: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="game-header">
+            <div class="score-display">Score: <span id="score">0</span></div>
+            <div class="info-box" id="level-display">Level 1: Beginner</div>
+        </div>
+        
+        <div class="canvas-container">
+            <canvas id="gameCanvas" width="400" height="400"></canvas>
+        </div>
+        
+        <div class="game-info">
+            <div class="info-box">Food: <span id="food-display" class="food-normal">Normal</span></div>
+            <div class="info-box">Combo: <span id="combo-display">x1.0</span></div>
+            <div class="info-box">Power-ups: <span id="powerups-display">0</span></div>
+        </div>
+        
+        <div class="controls">
+            <button id="restart-btn" class="restart-button">Restart Game</button>
+            <p>Use arrow keys to move, or touch the screen in the direction you want to go.</p>
+        </div>
+    </div>
+
+    <!-- Add script tags to load the game files -->
+    <script src="js/utils.js"></script>
+    <script src="js/zones.js"></script>
+    <script src="js/renderer.js"></script>
+    <script src="js/gameState.js"></script>
+    <script src="js/input.js"></script>
+    <script src="js/sound.js"></script>
+    <script src="js/performance.js"></script>
+    <script src="js/game.js"></script>
+    <script>
+        // Initialize performance monitor when the game starts
+        document.addEventListener('DOMContentLoaded', () => {
+            PerformanceMonitor.init();
+        });
+    </script>
+</body>
+</html>
